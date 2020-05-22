@@ -2,7 +2,7 @@ const path = require("path")
 
 module.exports = {
     mode: "none",
-    entry: "./src/App.fsproj",
+    entry: "./src/Saves.fsproj",
     devServer: {
         contentBase: path.join(__dirname, "./dist")
     },
