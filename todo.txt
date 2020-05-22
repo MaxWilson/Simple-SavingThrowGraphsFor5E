@@ -7,3 +7,5 @@ Settings:
    Saving throw vs ability check
    Bypass Magic resistance?
    Maximum number of monsters you can hit
+   
+Show best/worst monster for each CR range
