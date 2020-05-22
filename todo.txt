@@ -1,0 +1,9 @@
+Dimensions:
+   the biggest Xanathar mob allowed, the highest-CR solo, the median mob, and a random-sized mob
+   Ability scores
+   Level range
+   
+Settings:
+   Saving throw vs ability check
+   Bypass Magic resistance?
+   Maximum number of monsters you can hit

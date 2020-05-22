@@ -10,6 +10,10 @@ module.exports = {
         rules: [{
             test: /\.fs(x|proj)?$/,
             use: "fable-loader"
+        },
+        {
+            test: /\.js$/,
+            loader: 'ify-loader'
         }]
     }
 }
