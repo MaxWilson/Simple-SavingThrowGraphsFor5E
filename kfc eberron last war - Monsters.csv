@@ -1,0 +1,39 @@
+fid,name,cr,size,type,tags,section,alignment,environment,ac,hp,init,lair?,legendary?,unique?,sources
+erftlw.belashyrra,Belashyrra,22,Medium,Aberration,,Daelkyr,chaotic evil,,19,304,5,,legendary,unique,Eberron - Rising from the Last War: 286
+erftlw.dyrrn,Dyrrn,24,Medium,Aberration,,Daelkyr,chaotic evil,,21,325,5,,legendary,unique,Eberron - Rising from the Last War: 288
+erftlw.clawfoot,Clawfoot,1,Medium,Beast,,Dinosaurs,unaligned,,13,19,3,,,,Eberron - Rising from the Last War: 289
+erftlw.fastieth,Fastieth,1/4,Medium,Beast,,Dinosaurs,unaligned,,14,9,4,,,,Eberron - Rising from the Last War: 289
+erftlw.dolgaunt,Dolgaunt,3,Medium,Aberration,,,lawful evil,,16,33,4,,,,Eberron - Rising from the Last War: 290
+erftlw.dolgrim,Dolgrim,1/2,Small,Aberration,,,chaotic evil,,15,13,2,,,,Eberron - Rising from the Last War: 291
+erftlw.dusk-hag,Dusk Hag,6,Medium,Fey,,,neutral evil,,17,82,2,,,,Eberron - Rising from the Last War: 292
+erftlw.expeditious-messenger,Expeditious Messenger,1/8,Tiny,Construct,,Homunculi,neutral,,13,7,3,,,,Eberron - Rising from the Last War: 293
+erftlw.iron-defender,Iron Defender,1,Medium,Construct,,Homunculi,neutral,,17,30,2,,,,Eberron - Rising from the Last War: 293
+erftlw.inspired,Inspired,2,Medium,Humanoid,Human,,lawful evil,,12,40,2,,,,Eberron - Rising from the Last War: 294
+erftlw.karrnathi-undead-soldier,Karrnathi Undead Soldier,3,Medium,Undead,,,lawful evil,,17,52,2,,,,Eberron - Rising from the Last War: 295
+erftlw.lady-illmarrow,Lady Illmarrow,22,Medium,Undead,,,neutral evil,,19,199,3,,legendary,unique,Eberron - Rising from the Last War: 297
+erftlw.living-burning-hands,Living Burning Hands,1,Medium,Construct,,Living Spells,unaligned,,15,15,1,,,,Eberron - Rising from the Last War: 298
+erftlw.living-lightning-bolt,Living Lightning Bolt,5,Large,Construct,,Living Spells,unaligned,,15,57,2,,,,Eberron - Rising from the Last War: 299
+erftlw.living-cloudkill,Living Cloudkill,7,Large,Construct,,Living Spells,unaligned,,15,73,2,,,,Eberron - Rising from the Last War: 299
+erftlw.the-lord-of-blades,The Lord of Blades,18,Medium,Humanoid,Warforged,,lawful evil,,19,195,2,,legendary,unique,Eberron - Rising from the Last War: 300
+erftlw.mordakhesh,Mordakhesh,15,Medium,Fiend,,,lawful evil,,18,170,3,,legendary,unique,Eberron - Rising from the Last War: 301
+erftlw.rak-tulkhesh,Rak Tulkhesh,28,Huge,Fiend,,Overlords,neutral evil,,23,478,4,,legendary,unique,Eberron - Rising from the Last War: 303
+erftlw.sul-khatesh,Sul Khatesh,28,Large,Fiend,,Overlords,lawful evil,,22,475,5,,legendary,unique,Eberron - Rising from the Last War: 304
+erftlw.hashalaq-quori,Hashalaq Quori,9,Medium,Aberration,,Quori,lawful evil,,17,99,2,,,,Eberron - Rising from the Last War: 305
+erftlw.kalaraq-quori,Kalaraq Quori,19,Medium,Aberration,,Quori,lawful evil,,18,161,5,,,,Eberron - Rising from the Last War: 306
+erftlw.tsucora-quori,Tsucora Quori,7,Medium,Aberration,,Quori,lawful evil,,16,68,2,,,,Eberron - Rising from the Last War: 307
+erftlw.radiant-idol,Radiant Idol,11,Large,Celestial,,,lawful evil,,18,142,4,,,,Eberron - Rising from the Last War: 308
+erftlw.zakya-rakshasa,Zakya Rakshasa,5,Medium,Fiend,,,lawful evil,,18,59,2,,,,Eberron - Rising from the Last War: 309
+erftlw.undying-councilor,Undying Councilor,10,Medium,Undead,,Undying,neutral good,,17,104,0,,,,Eberron - Rising from the Last War: 311
+erftlw.undying-soldier,Undying Soldier,2,Medium,Undead,,Undying,neutral good,,17,26,1,,,,Eberron - Rising from the Last War: 311
+erftlw.valenar-hawk,Valenar Hawk,1/8,Tiny,Fey,,Valenar Animals,neutral,,14,10,4,,,,Eberron - Rising from the Last War: 312
+erftlw.valenar-hound,Valenar Hound,1/2,Medium,Fey,,Valenar Animals,neutral,,14,19,2,,,,Eberron - Rising from the Last War: 312
+erftlw.valenar-steed,Valenar Steed,1/2,Large,Fey,,Valenar Animals,neutral,,13,22,3,,,,Eberron - Rising from the Last War: 313
+erftlw.warforged-colossus,Warforged Colossus,25,Gargantuan,Construct,,,unaligned,,23,410,0,,,,Eberron - Rising from the Last War: 314
+erftlw.warforged-titan,Warforged Titan,8,Huge,Construct,,,lawful neutral,,20,125,-1,,,,Eberron - Rising from the Last War: 315
+erftlw.bone-knight,Bone Knight,5,Medium,Humanoid,Any,NPCs,any non-good,,20,84,1,,,,Eberron - Rising from the Last War: 316
+erftlw.changeling,Changeling,1/2,Medium,Humanoid,"Changeling, Shapechanger",NPCs,any,,13,22,2,,,,Eberron - Rising from the Last War: 317
+erftlw.kalashtar,Kalashtar,1/4,Medium,Humanoid,Kalashtar,NPCs,any,,12,16,2,,,,Eberron - Rising from the Last War: 317
+erftlw.magewright,Magewright,0,Medium,Humanoid,Any,NPCs,any,,11,9,1,,,,Eberron - Rising from the Last War: 318
+erftlw.shifter,Shifter,1/2,Medium,Humanoid,Shifter,NPCs,any,,14,19,3,,,,Eberron - Rising from the Last War: 319
+erftlw.tarkanan-assassin,Tarkanan Assassin,2,Medium,Humanoid,Any,NPCs,any non-good,,15,45,3,,,,Eberron - Rising from the Last War: 320
+erftlw.warforged-soldier,Warforged Soldier,1,Medium,Humanoid,Warforged,NPCs,any,,16,30,1,,,,Eberron - Rising from the Last War: 320
