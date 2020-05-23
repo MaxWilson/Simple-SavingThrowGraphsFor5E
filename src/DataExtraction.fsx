@@ -61,8 +61,10 @@ let parseRow a =
             | true, n -> n
             | _ -> failwithf "'%s' is not an int (%s)" v (a:Creature).name
         | v -> failwithf "'%s' is not an int (%s)" v a.name
-    let v n =
-        a.saves |> List.tryPick (fun (label, dc) -> if label = n then Some dc else None)
+    let getSaveDC name =
+        match a.saves |> List.choose (fun (label, dc) -> if label = name then Some dc else None) with
+        | [] -> None
+        | saves -> Some(List.max saves)
     let tags =
         match a.txt with
         | RE ptags [tags] -> tags
@@ -137,12 +139,12 @@ let parseRow a =
         ac = (intStat "armor_class") 
         hp = (intStat "hit_points") 
         speed = (strStat "speed") 
-        dcStr = (v "Strength") 
-        dcDex = (v "Dexterity") 
-        dcCon = (v "Constitution") 
-        dcInt = (v "Intelligence") 
-        dcWis = (v "Wisdom") 
-        dcCha = (v "Charisma") 
+        dcStr = (getSaveDC "Strength") 
+        dcDex = (getSaveDC "Dexterity") 
+        dcCon = (getSaveDC "Constitution") 
+        dcInt = (getSaveDC "Intelligence") 
+        dcWis = (getSaveDC "Wisdom") 
+        dcCha = (getSaveDC "Charisma") 
         skills = (listIntStat "skills")
         conditionImmunities = listStat "condition_immunities"
         damageImmunities = strStat "damage_immunities"
@@ -158,7 +160,7 @@ let all = annotations |> Seq.map (fun (KeyValue(_, notes)) -> notes) |> Seq.sort
 open Newtonsoft.Json
 *)
 
-System.IO.File.WriteAllText("c:\code\saves\data.json", all |> JsonConvert.SerializeObject)
+System.IO.File.WriteAllText(@"c:\code\saves\annotations.json", all |> JsonConvert.SerializeObject)
 
 type KoboldRow = {
     name: string
@@ -267,8 +269,18 @@ correct "Mind Flayer Lich (Illithilich)" "Illithilich"
 correct "Pidlewick II" "Pidlwick II"
 correct "Burrow Shark" "Burrowshark"
 correct "Iymrith the Dragon" "Iymrith, Ancient Blue Dragon"
+correct "Cow (Ox)" "Ox"
+annotations <- annotations |> Map.add "Demilich (Acererak)" (let d = annotations.["Demilich"] in { d with saves = ("Charisma", 19)::d.saves })
+annotations <- annotations |> Map.add "Demilich (Acererak in lair)" (let d = annotations.["Demilich"] in { d with saves = ("Charisma", 19)::d.saves })
 
-allMonsters <- allMonsters |> List.map (function m when m.name = "OgrÃ©moch" -> { m with name = "Ogremoch" } | m -> m)
+allMonsters |> Seq.find (fun m -> m.name = "Demilich (in lair)")
+
+// correct some mangled or misleading names
+allMonsters <- allMonsters |> List.map (function m when m.name = "OgrÃ©moch" -> { m with name = "Ogremoch" } | m when m.name = "Hook Horror Servant" -> { m with name = "Hook Horror Spore Servant" } | m -> m)
+
+// exclude dumb low-level campaign-specific unique NPCs while retaining unique high-level monsters that might actually show up in play
+allMonsters <- allMonsters |> List.filter (fun m -> not (m.unique && m.cr <= 8.)) 
+
 for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
     if m.stats.IsNone then
         currentRow <- m
@@ -288,7 +300,6 @@ for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
         //
 
 // remove monsters that aren't real monsters deserving of a separate entry
-allMonsters <- allMonsters |> List.filter (fun m -> match m.name with | "Hook Horror Servant" -> false | _ -> true)
 allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.iter (fun m -> printfn "%s needs stats" m.name)
 annotations.["Mind Flayer"] |> parseRow
 allMonsters |> Seq.filter (fun m -> m.name = "Mind Flayer")
@@ -298,3 +309,4 @@ allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.length
 annotations.["Grazz't"]
 
 allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.map(fun m -> m.source) |> Seq.distinct |> Array.ofSeq
+allMonsters |> Seq.filter (fun m -> m.unique && m.cr <= 8. ) |> Seq.map (fun m -> m.name, m.cr, m.source) |> Array.ofSeq
