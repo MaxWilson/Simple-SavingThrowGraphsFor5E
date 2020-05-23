@@ -170,6 +170,8 @@ type KoboldRow = {
     alignment: string
     ac: int
     hp: int
+    legendary: bool
+    unique: bool
     source: string
     }
 
@@ -183,7 +185,7 @@ let readField (str: string) startIx =
         v, endIx+2
     else
         let mutable endIx = startIx
-        while str.[endIx] <> ',' && endIx + 1 < str.Length do endIx <- endIx + 1
+        while endIx < str.Length && str.[endIx] <> ',' do endIx <- endIx + 1
         let v = str.Substring(startIx, endIx - startIx).Trim()
         v, endIx+1
 let readFields (str: string) = 
@@ -194,6 +196,7 @@ let readFields (str: string) =
             let v, ix = readField str ix
             loop (acc@[v]) ix
     loop [] 0
+readFields "abc, def"
 let parseInt v = 
         match v with
         | RE "([0-9 ]+)" [raw] ->    
@@ -206,7 +209,7 @@ let loadKobold fileName =
     let csv = System.IO.File.ReadAllLines fileName |> Seq.skip 1 |> List.ofSeq
     [for line in csv do
         printfn "%s" line
-        let [_;_;name;cr;size;type';tags;_;align;_;ac;hp;_;_;_;_;src] = readFields line
+        let [_;_;name;cr;size;type';tags;_;align;_;ac;hp;_;_;legendary;unique;src] = readFields line
         {
             KoboldRow.name = name
             stats = None
@@ -217,6 +220,8 @@ let loadKobold fileName =
             alignment = align
             ac = parseInt ac
             hp = parseInt hp
+            legendary = not <| System.String.IsNullOrWhiteSpace legendary
+            unique = not <| System.String.IsNullOrWhiteSpace unique
             source = src
             }
         ]
@@ -225,7 +230,7 @@ let loadExt fileName =
     let csv = System.IO.File.ReadAllLines fileName |> Seq.skip 1 |> List.ofSeq
     [for line in csv do
         printfn "%s" line
-        let [_;name;cr;size;type';tags;_;align;_;ac;hp;_;_;_;_;src] = readFields line
+        let [_;name;cr;size;type';tags;_;align;_;ac;hp;_;_;legendary;unique;src] = readFields line
         {
             KoboldRow.name = name
             stats = None
@@ -236,6 +241,8 @@ let loadExt fileName =
             alignment = align
             ac = parseInt ac
             hp = parseInt hp
+            legendary = not <| System.String.IsNullOrWhiteSpace legendary
+            unique = not <| System.String.IsNullOrWhiteSpace unique
             source = src
             }
         ]
@@ -253,7 +260,15 @@ let load () =
 save() 
 load()
 let mutable currentRow = allMonsters.Head
-annotations <- annotations |> Map.add "Mind Flayer Lich (Illithilich)" (annotations.["Illithilich"])
+let correct name src =
+    if not <| annotations.ContainsKey name then
+        annotations <- annotations |> Map.add name (annotations.[src])
+correct "Mind Flayer Lich (Illithilich)" "Illithilich"
+correct "Pidlewick II" "Pidlwick II"
+correct "Burrow Shark" "Burrowshark"
+correct "Iymrith the Dragon" "Iymrith, Ancient Blue Dragon"
+
+allMonsters <- allMonsters |> List.map (function m when m.name = "OgrÃ©moch" -> { m with name = "Ogremoch" } | m -> m)
 for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
     if m.stats.IsNone then
         currentRow <- m
@@ -272,6 +287,8 @@ for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
             printfn "Could not find stats for '%s' (%s)" m.name m.source
         //
 
+// remove monsters that aren't real monsters deserving of a separate entry
+allMonsters <- allMonsters |> List.filter (fun m -> match m.name with | "Hook Horror Servant" -> false | _ -> true)
 allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.iter (fun m -> printfn "%s needs stats" m.name)
 annotations.["Mind Flayer"] |> parseRow
 allMonsters |> Seq.filter (fun m -> m.name = "Mind Flayer")
@@ -280,3 +297,4 @@ allMonsters.Length
 allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.length
 annotations.["Grazz't"]
 
+allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.map(fun m -> m.source) |> Seq.distinct |> Array.ofSeq
