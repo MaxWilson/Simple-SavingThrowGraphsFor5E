@@ -6,78 +6,40 @@ open Feliz
 
 open Feliz.Plotly
 
-let xData = [ 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 10; 9; 8; 7; 6; 5; 4; 3; 2; 1 ]
-let yData = [ 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 9; 8; 7; 6; 5; 4; 3; 2; 1; 0 ]
-
-let xData2 = [ 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 10; 9; 8; 7; 6; 5; 4; 3; 2; 1 ]
-let yData2 = [ 5.5; 3.; 5.5; 8.; 6.; 3.; 8.; 5.; 6.; 5.5; 4.75; 5.; 4.; 7.; 2.; 4.; 7.; 4.4; 2.; 4.5 ]
-
-let xData3 = [ 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 10; 9; 8; 7; 6; 5; 4; 3; 2; 1 ]
-let yData3 = [ 11.; 9.; 7.; 5.; 3.; 1.; 3.; 5.; 3.; 1.; -1.; 1.; 3.; 1.; -0.5; 1.; 3.; 5.; 7.; 9. ]
-
-let chart () =
+let chart (lines: Map<string, float list>) =
+    let colors = [(0, 100, 80); (0, 176, 246); (231, 107, 243)]
+    let mkColor ix = colors.[ix % colors.Length] |> color.rgb
+    let mkFill ix = colors.[ix % colors.Length] |> (fun (x,y,z) -> color.rgba(x,y,z,0.2))
+    let myline key ix =
+        let data = lines.[key]
+        traces.scatter [
+            scatter.x [ 1 .. (data.Length) ]
+            scatter.y data
+            scatter.line [
+                line.color (colors.[ix % colors.Length] |> color.rgb)
+            ]
+            scatter.mode.lines
+            scatter.name key
+            ]
+    let background key ix =
+        let data = lines.[key]
+        let xs: int list = ([ 1 .. (data.Length) ] @ [ (data.Length) .. -1 .. 1 ])
+        traces.scatter [
+            scatter.x xs
+            scatter.y ((data |> List.map ((+) 2.))@(data |> List.rev |> List.map (fun x -> x - 2.)))
+            scatter.fill.toself
+            scatter.fillcolor (colors.[ix % colors.Length] |> (fun (x,y,z) -> color.rgba(x,y,z,0.2)))
+            scatter.line [
+                line.color color.transparent
+            ]
+            scatter.name key
+            scatter.showlegend false
+        ]
     Plotly.plot [
         plot.traces [
-            traces.scatter [
-                scatter.x xData
-                scatter.y yData
-                scatter.fill.toself
-                scatter.fillcolor (color.rgba(0, 100, 80, 0.2))
-                scatter.line [
-                    line.color color.transparent
-                ]
-                scatter.name "Fair"
-                scatter.showlegend false
-            ]
-            traces.scatter [
-                scatter.x xData2
-                scatter.y yData2
-                scatter.fill.toself
-                scatter.fillcolor (color.rgba(0, 176, 246, 0.2))
-                scatter.line [
-                    line.color color.transparent
-                ]
-                scatter.name "Premium"
-                scatter.showlegend false
-            ]
-            traces.scatter [
-                scatter.x xData3
-                scatter.y yData3
-                scatter.fill.toself
-                scatter.fillcolor (color.rgba(231, 107, 243, 0.2))
-                scatter.line [
-                    line.color color.transparent
-                ]
-                scatter.name "Fair"
-                scatter.showlegend false
-            ]
-            traces.scatter [
-                scatter.x [ 1 .. 10 ]
-                scatter.y [ 1 .. 10 ]
-                scatter.line [
-                    line.color (color.rgb(0, 100, 80))
-                ]
-                scatter.mode.lines
-                scatter.name "Fair"
-            ]
-            traces.scatter [
-                scatter.x [ 1 .. 10 ]
-                scatter.y [ 5.; 2.5; 5.; 7.5; 5.; 2.5; 7.5; 4.5; 5.5; 5. ]
-                scatter.line [
-                    line.color (color.rgb(0, 176, 246))
-                ]
-                scatter.mode.lines
-                scatter.name "Premium"
-            ]
-            traces.scatter [
-                scatter.x [ 1 .. 10 ]
-                scatter.y [ 10; 8; 6; 4; 2; 0; 2; 4; 2; 0 ]
-                scatter.line [
-                    line.color (color.rgb(231, 107, 243))
-                ]
-                scatter.mode.lines
-                scatter.name "Ideal"
-            ]
+            for name, ix in lines |> Seq.mapi(fun i (KeyValue(name,_)) -> name, i) do
+                background name ix
+                myline name ix
         ]
         plot.layout [
             layout.paperBgcolor (color.rgb(255, 255, 255))
@@ -105,22 +67,40 @@ let chart () =
     ]
 
 type State =
-    { Count: int }
+    { Count: int; lines: Map<string, float list> }
 
 type Msg =
     | Increment
     | Decrement
 
+let lines =
+    [
+    "Fair", [1..10] |> List.map float
+    "Premium", [ 5.; 2.5; 5.; 7.5; 5.; 2.5; 7.5; 4.5; 5.5; 5. ]
+    "Ideal", [ 10; 8; 6; 4; 2; 0; 2; 4; 2; 0 ] |> List.map float
+    ] |> Map.ofList
+
+let r = System.Random()
+let setLength (s: State) =
+    let l = s.Count
+    let adjust _ (line: float list) =
+        if line.Length = l then line
+        elif line.Length > l then List.take l line
+        else line @ [r.NextDouble() * 10.]
+    { s with lines = s.lines |> Map.map adjust }
+
+
 let init() =
-    { Count = 0 }
+    { Count = 0; lines = lines }
 
 let update (msg: Msg) (state: State): State =
     match msg with
     | Increment ->
-        { state with Count = state.Count + 1 }
+        { state with Count = state.Count + 1 } |> setLength
 
     | Decrement ->
-        { state with Count = state.Count - 1 }
+        { state with Count = state.Count - 1 } |> setLength
+
 
 let render (state: State) (dispatch: Msg -> unit) =
   Html.div [
@@ -135,7 +115,7 @@ let render (state: State) (dispatch: Msg -> unit) =
     ]
 
     Html.h1 state.Count
-    chart()
+    chart state.lines
   ]
 
 Program.mkSimple init update render
