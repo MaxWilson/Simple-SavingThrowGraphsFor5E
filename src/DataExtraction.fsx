@@ -37,6 +37,7 @@ type Row = {
     int: int * int option
     wis: int * int option
     cha: int * int option
+    advantage: string
     ac: int
     hp: int
     speed: string
@@ -139,7 +140,8 @@ let parseRow a =
         cha = (stat "cha") 
         ac = (intStat "armor_class") 
         hp = (intStat "hit_points") 
-        magicResistance = match a.txt with RE "(Magic Resistance)" [_] -> true | _ -> false 
+        magicResistance = match a.txt with RE "(Magic Resistance|Magic Immunity)" [_] -> true | _ -> false 
+        advantage = match a.txt with RE "advantage on (\s+) saving throws" [attr] -> "attr" | RE "advantage on saving throws against (being )?(\w+)" [_;effect] -> effect | _ -> null 
         speed = (strStat "speed") 
         dcStr = (getSaveDC "Strength") 
         dcDex = (getSaveDC "Dexterity") 
@@ -300,18 +302,21 @@ for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
                 printfn "%s OK" m.name
             with _ -> printfn "Could not parse '%s' (%s)" m.name m.source
         | None ->
-            printfn "supplyStats (\"%s\", strdexconintwischa, [], ac, hp, \"30 ft.\", [], [], []) // %s" m.name m.source
+            printfn "supplyStats (\"%s\", achpstrdexconintwischa, [], \"30 ft.\", [], [], []) // %s" m.name m.source
         //
 
 // remove monsters that aren't real monsters deserving of a separate entry
 save()
 
-type SavingThrow = Str of int | Dex of int | Con of int | Int of int | Wis of int | Cha of int | MR
-type Resist = Vuln of string | Resist of string | Immune of string | Conditions of string list
-type Prof = Arcana | History | Insight | Perception | Religion
+type SavingThrow = Str of int | Dex of int | Con of int | Int of int | Wis of int | Cha of int | MR | Advantage of string
+type Condition = Blinded | Charmed | Exhaustion | Frightened | Poisoned | Prone | Restrained | Deafened | Paralyzed | Unconscious | Petrified | Stunned | Grappled | Incapacitated
+type Resist = Vuln of string | Resist of string | Immune of string | Conditions of Condition list
+type Prof = Arcana | History | Insight | Religion | Performance | Perception | Persuasion | Stealth | Acrobatics | Deception | Athletics | Intimidation | Medicine | Nature | Sleight | Survival
 let supplyStats args =
     let (
                 name: string,
+                ac: int, 
+                hp: int,
                 str: int, 
                 dex: int,
                 con: int,
@@ -319,8 +324,6 @@ let supplyStats args =
                 wis: int,
                 cha: int,
                 saves: SavingThrow list,
-                ac: int,
-                hp: int,
                 speed: string,
                 skills: (Prof * int) list,
                 resists: Resist list,
@@ -343,12 +346,13 @@ let supplyStats args =
             ac = ac
             hp = hp
             magicResistance = saves |> List.exists(function MR -> true | _ -> false)
+            advantage = saves |> List.tryPick(function Advantage attr -> Some attr | _ -> None) |> function Some v -> v | None -> null
             speed = speed
-            skills = skills |> List.map (fun (skill, bonus) -> skill.ToString(), bonus)
+            skills = skills |> List.map (function (Sleight, bonus) -> "Sleight of Hand", bonus | (skill, bonus) -> skill.ToString(), bonus)
             damageVuln = resists |> List.tryPick(function Vuln x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
             damageResistances = resists |> List.tryPick(function Resist x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
             damageImmunities = resists |> List.tryPick(function Immune x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
-            conditionImmunities = resists |> List.tryPick(function Conditions x -> Some x | _ -> None) |> (function Some x -> x | _ -> [])
+            conditionImmunities = resists |> List.tryPick(function Conditions x -> Some x | _ -> None) |> (function Some x -> x |> List.map (fun x -> (sprintf "%A" x).ToLowerInvariant()) | _ -> [])
             dcStr = dc |> List.tryPick(function Str x -> Some x | _ -> None)
             dcDex = dc |> List.tryPick(function Dex x -> Some x | _ -> None)
             dcCon = dc |> List.tryPick(function Con x -> Some x | _ -> None)
@@ -357,51 +361,51 @@ let supplyStats args =
             dcCha = dc |> List.tryPick(function Cha x -> Some x | _ -> None)
             }
 
-supplyStats ("Giant Ice Toad", 16, 13, 14, 8, 10, 6, [], 14, 52, "30 ft.", [], [], []) // Tales from the Yawning Portal: 235
-supplyStats ("Giant Skeleton", 21, 10, 20, 4, 6, 6, [], 17, 115, "30 ft.", [], [Vuln "bludgeoning"; Immune "poison"; Conditions ["exhaustion"; "poisoned"]], []) // Tales from the Yawning Portal: 236
-supplyStats ("Thayan Apprentice", 10, 14, 12, 15, 13, 11, [], 12, 27, "30 ft.", [Arcana, 4], [], []) // Tales from the Yawning Portal: 245
-supplyStats ("Acererak", 13, 16, 20, 27, 21, 20, [Con 12; Int 15; Wis 12], 21, 285, "30 ft.", [Arcana, 22; History, 22; Insight, 12; Perception, 12; Religion, 15], [], []) // Tomb of Annihilation: 209
-supplyStats ("Tabaxi Ministrel", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Tomb of Annihilation: 233
-supplyStats ("Decapus", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // The Tortle Package: 21
-supplyStats ("Geonid", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // The Tortle Package: 22
-supplyStats ("Topi", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // The Tortle Package: 22
-supplyStats ("Belashyrra", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 286
-supplyStats ("Dyrrn", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 288
-supplyStats ("Clawfoot", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 289
-supplyStats ("Fastieth", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 289
-supplyStats ("Dolgaunt", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 290
-supplyStats ("Dolgrim", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 291
-supplyStats ("Dusk Hag", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 292
-supplyStats ("Expeditious Messenger", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 293
-supplyStats ("Iron Defender", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 293
-supplyStats ("Inspired", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 294
-supplyStats ("Karrnathi Undead Soldier", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 295
-supplyStats ("Lady Illmarrow", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 297
-supplyStats ("Living Burning Hands", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 298
-supplyStats ("Living Lightning Bolt", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 299
-supplyStats ("Living Cloudkill", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 299
-supplyStats ("The Lord of Blades", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 300
-supplyStats ("Mordakhesh", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 301
-supplyStats ("Rak Tulkhesh", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 303
-supplyStats ("Sul Khatesh", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 304
-supplyStats ("Hashalaq Quori", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 305
-supplyStats ("Kalaraq Quori", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 306
-supplyStats ("Tsucora Quori", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 307
-supplyStats ("Radiant Idol", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 308
-supplyStats ("Zakya Rakshasa", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 309
-supplyStats ("Undying Councilor", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 311
-supplyStats ("Undying Soldier", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 311
-supplyStats ("Valenar Hawk", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 312
-supplyStats ("Valenar Hound", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 312
-supplyStats ("Valenar Steed", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 313
-supplyStats ("Warforged Colossus", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 314
-supplyStats ("Warforged Titan", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 315
-supplyStats ("Bone Knight", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 316
-supplyStats ("Changeling", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 317
-supplyStats ("Kalashtar", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 317
-supplyStats ("Magewright", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 318
-supplyStats ("Shifter", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 319
-supplyStats ("Tarkanan Assassin", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 320
-supplyStats ("Warforged Soldier", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Eberron - Rising from the Last War: 320
+supplyStats ("Giant Ice Toad", 14, 52, 16, 13, 14, 8, 10, 6, [], "30 ft.", [], [], []) // Tales from the Yawning Portal: 235
+supplyStats ("Giant Skeleton", 17, 115, 21, 10, 20, 4, 6, 6, [], "30 ft.", [], [Vuln "bludgeoning"; Immune "poison"; Conditions [Exhaustion; Poisoned]], []) // Tales from the Yawning Portal: 236
+supplyStats ("Thayan Apprentice", 12, 27, 10, 14, 12, 15, 13, 11, [], "30 ft.", [Arcana, 4], [], []) // Tales from the Yawning Portal: 245
+supplyStats ("Acererak", 21, 285, 13, 16, 20, 27, 21, 20, [Con 12; Int 15; Wis 12], "30 ft.", [Arcana, 22; History, 22; Insight, 12; Perception, 12; Religion, 15], [], [Con 23; Wis 20]) // Tomb of Annihilation: 209
+supplyStats ("Tabaxi Ministrel", 12, 22, 10, 15, 11, 14, 12, 16, [], "30 ft., climb 20 ft.", [Perception, 3; Performance, 7; Persuasion, 5; Stealth, 4], [Resist "cold, lightning"; Immune "necrotic, poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned; Stunned]], []) // Tomb of Annihilation: 233
+supplyStats ("Belashyrra", 19, 304, 24, 21, 20, 25, 22, 23, [Int 14; Wis 13; Cha 13; MR], "40 ft., fly 40 ft. (hover)", [Arcana, 14; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Int 22; Con 22]) // Eberron - Rising from the Last War: 286
+supplyStats ("Dyrrn", 21, 325, 26, 21, 22, 26, 23, 24, [Int 15; Wis 13; Cha 14; MR], "40 ft., fly 40 ft. (hover).", [Arcana, 15; History, 15; Insight, 13; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Con 23; Int 23]) // Eberron - Rising from the Last War: 288
+supplyStats ("Clawfoot", 13, 19, 12, 16, 14, 4, 12, 6, [], "40 ft.", [Perception, 3; Stealth, 5], [], []) // Eberron - Rising from the Last War: 289
+supplyStats ("Fastieth", 14, 9, 12, 18, 10, 4, 11, 4, [], "50 ft.", [], [], []) // Eberron - Rising from the Last War: 289
+supplyStats ("Dolgaunt", 16, 33, 14, 18, 12, 13, 14, 11, [], "40 ft.", [Acrobatics, 6; Perception, 4; Stealth, 6], [Conditions [Blinded]], [Con 11]) // Eberron - Rising from the Last War: 290
+supplyStats ("Dolgrim", 15, 13, 15, 14, 12, 8, 10, 8, [], "30 ft.", [], [], []) // Eberron - Rising from the Last War: 291
+supplyStats ("Dusk Hag", 17, 82, 11, 14, 12, 17, 16, 18, [Int 6; Wis 6; MR], "30 ft.", [Deception, 7; Insight, 6; Perception, 6], [Conditions[Blinded; Charmed; Frightened]], [Wis 15]) // Eberron - Rising from the Last War: 292
+supplyStats ("Expeditious Messenger", 13, 7, 6, 16, 13, 8, 12, 7, [], "25 ft., fly 60 ft.", [Acrobatics, 5; Stealth, 5], [Immune "poison"; Conditions [Exhaustion; Poisoned]], []) // Eberron - Rising from the Last War: 293
+supplyStats ("Iron Defender", 17, 30, 16, 14, 16, 8, 11, 7, [], "40 ft.", [Perception, 3; Stealth, 4], [Immune "poison"; Conditions [Exhaustion; Poisoned]], [Str 13]) // Eberron - Rising from the Last War: 293
+supplyStats ("Inspired", 12, 40, 11, 14, 10, 16, 10, 16, [Int 5; Wis 2; Advantage "Wisdom"], "30 ft.", [Deception, 7; Insight, 2; Persuasion, 7], [Resist "psychic"; Conditions [Charmed; Frightened]], [Wis 13]) // Eberron - Rising from the Last War: 294
+supplyStats ("Karrnathi Undead Soldier", 17, 52, 16, 14, 16, 12, 13, 5, [], "30 ft.", [Athletics, 5; Perception, 5], [Resist "cold, poison"; Conditions [Charmed; Frightened; Poisoned]], []) // Eberron - Rising from the Last War: 295
+supplyStats ("Lady Illmarrow", 19, 199, 16, 16, 20, 27, 21, 24, [Con 12; Int 15; Wis 12; MR], "30 ft., fly 40 ft.", [Arcana, 15; History, 15; Insight, 12; Perception, 12], [Resist "cold, lightning"; Immune "necrotic, poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned; Stunned]], [Con 20; Wis 20]) // Eberron - Rising from the Last War: 297
+supplyStats ("Living Burning Hands", 15, 15, 10, 12, 16, 3, 6, 6, [MR], "25 ft., fly 25 ft. (hover)", [], [Resist "bludgeoning, piercing, and slashing from nonmagical attacks"; Immune "fire"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Grappled; Poisoned; Prone]], [Dex 13]) // Eberron - Rising from the Last War: 298
+supplyStats ("Living Lightning Bolt", 15, 57, 10, 15, 18, 3, 10, 6, [MR], "25 ft., fly 25 ft. (hover)", [], [Resist "bludgeoning, piercing, and slashing from nonmagical attacks"; Immune "fire"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Grappled; Poisoned; Prone]], [Dex 15]) // Eberron - Rising from the Last War: 299
+supplyStats ("Living Cloudkill", 15, 73, 10, 15, 14, 3, 11, 6, [], "25 ft., fly 25 ft. (hover)", [], [Resist "bludgeoning, piercing, and slashing from nonmagical attacks"; Immune "fire"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Grappled; Poisoned; Prone]], [Con 16]) // Eberron - Rising from the Last War: 299
+supplyStats ("The Lord of Blades", 19, 195, 20, 15, 18, 19, 17, 18, [Str 11; Con 10; Int 10; Wis 9; Advantage "poison"], "40 ft.", [Arcana, 10; Athletics, 11; History, 10; Perception, 9], [Resist "necrotic, poison"; Conditions [Charmed; Exhaustion; Frightened]], [Str 19]) // Eberron - Rising from the Last War: 300
+supplyStats ("Mordakhesh", 18, 170, 20, 16, 18, 15, 17, 20, [Str 10; Con 9; Wis 8; Cha 10; MR], "40 ft.", [Athletics, 10; Insight, 8; Perception, 8; Persuasion, 10], [Vuln "piercing from magic weapons wielded by good creatures"; Resist "bludgeoning, piercing, and slashing from nonmagical attacks not made with silvered weapons"], [Wis 18; Con 18]) // Eberron - Rising from the Last War: 301
+supplyStats ("Rak Tulkhesh", 23, 478, 29, 19, 27, 21, 22, 26, [Str 17; Con 16; Wis 14; Cha 16; MR], "40 ft., climb 40 ft., fly 80 ft.", [Athletics, 17; Intimidation, 16; Perception, 14], [Resist "cold, fire, lightning"; Immune "poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Poisoned; Stunned]], [Wis 24; Con 24]) // Eberron - Rising from the Last War: 303
+supplyStats ("Sul Khatesh", 22, 475, 18, 21, 19, 30, 22, 25, [Con 12; Int 18; Wis 14; Cha 15; MR; Advantage "concentration"], "40 ft., fly 40 ft. (hover)", [Arcana, 18; History, 18; Insight, 14; Religion, 18], [Resist "cold, fire, lightning"; Immune "poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned]], [Wis 26; Dex 26; Con 26]) // Eberron - Rising from the Last War: 304
+supplyStats ("Hashalaq Quori", 17, 99, 12, 14, 13, 18, 16, 18, [Wis 7; Cha 8], "40 ft.", [Arcana, 12; History, 12; Insight, 12; Persuasion, 8], [Resist "psychic"; Conditions [Charmed; Frightened]], [Wis 16; Int 16; Cha 16]) // Eberron - Rising from the Last War: 305
+supplyStats ("Kalaraq Quori", 18, 161, 12, 21, 18, 23, 24, 25, [Int 12; Wis 13; Cha 13; MR], "30 ft., fly 60 ft. (hover)", [Deception, 13; Perception, 13; Persuasion, 13], [Resist "cold, necrotic, poison, psychic, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Grappled; Paralyzed; Petrified; Prone; Restrained]], [Int 21; Wis 21; Cha 21]) // Eberron - Rising from the Last War: 306
+supplyStats ("Tsucora Quori", 16, 68, 17, 14, 18, 14, 14, 16, [Wis 5; Cha 6], "40 ft.", [Insight, 5; Perception, 6], [Resist "psychic"; Conditions [Charmed; Frightened]], [Wis 14; Cha 14]) // Eberron - Rising from the Last War: 307
+supplyStats ("Radiant Idol", 18, 142, 23, 18, 19, 17, 20, 21, [Wis 9; Cha 9; MR], "40 ft.", [Deception, 9; Insight, 9; Perception, 9; Persuasion, 9], [Resist "radiant, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened]], [Wis 17; Con 17]) // Eberron - Rising from the Last War: 308
+supplyStats ("Zakya Rakshasa", 18, 59, 18, 14, 18, 12, 13, 11, [MR], "30 ft.", [Athletics, 7; Perception, 4], [Vuln "piercing from magic weapons wielded by good creatures"; Resist "bludgeoning, piercing, and slashing from nonmagical attacks"], [Str 15; Wis 15]) // Eberron - Rising from the Last War: 309
+supplyStats ("Undying Councilor", 17, 104, 16, 10, 14, 17, 21, 16, [Con 6; Int 7; Wis 9; MR], "30 ft.", [Arcana, 7; History, 11; Insight, 9; Perception, 9; Religion, 7], [Vuln "necrotic"; Immune "poison, radiant"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Poisoned]], [Dex 17; Con 17]) // Eberron - Rising from the Last War: 311
+supplyStats ("Undying Soldier", 17, 26, 16, 12, 14, 11, 13, 14, [], "30 ft.", [Athletics, 5; History, 4; Perception, 3; Religion, 4], [Vuln "necrotic"; Resist "radiant, bludgeoning, piercing, and slashing from nonmagical attacks not made with silvered weapons"; Immune "poison"; Conditions [Exhaustion; Poisoned]], []) // Eberron - Rising from the Last War: 311
+supplyStats ("Valenar Hawk", 14, 10, 8, 18, 10, 9, 16, 11, [], "10 ft., fly 60 ft.", [Perception, 5], [], []) // Eberron - Rising from the Last War: 312
+supplyStats ("Valenar Hound", 14, 19, 17, 15, 14, 10, 15, 11, [], "40 ft.", [Perception, 4], [], []) // Eberron - Rising from the Last War: 312
+supplyStats ("Valenar Steed", 13, 22, 14, 16, 14, 10, 15, 11, [], "60 ft.", [Perception, 4], [], []) // Eberron - Rising from the Last War: 313
+supplyStats ("Warforged Colossus", 23, 410, 30, 11, 30, 3, 11, 8, [Int 4; Wis 8; Cha 7; MR], "60 ft.", [], [Immune "necrotic, poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened; Incapacitated; Paralyzed; Petrified; Poisoned; Stunned]], [Wis 26; Dex 26]) // Eberron - Rising from the Last War: 314
+supplyStats ("Warforged Titan", 20, 125, 23, 8, 22, 3, 11, 1, [], "40 ft.", [], [Immune "poison, psychic"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned]], [Str 17; Dex 17]) // Eberron - Rising from the Last War: 315
+supplyStats ("Bone Knight", 20, 84, 18, 13, 14, 12, 14, 16, [Wis 5; Cha 6], "30 ft.", [Athletics, 7; Deception, 6; Intimidation, 6], [Resist "necrotic, poison"], [Wis 14]) // Eberron - Rising from the Last War: 316
+supplyStats ("Changeling", 13, 22, 8, 15, 12, 14, 10, 16, [], "30 ft.", [Acrobatics, 4; Deception, 5; Insight, 2; Perception, 2; Persuasion, 5], [], [Wis 13]) // Eberron - Rising from the Last War: 317
+supplyStats ("Kalashtar", 12, 16, 12, 14, 12, 13, 15, 15, [Advantage "Wisdom"], "30 ft.", [Acrobatics, 4; Insight, 4; Persuasion, 6], [Resist "psychic"], [Wis 12]) // Eberron - Rising from the Last War: 317
+supplyStats ("Magewright", 11, 9, 11, 13, 10, 14, 14, 12, [], "30 ft.", [Arcana, 4; Performance, 4; Medicine, 4; Insight, 4; Persuasion, 5; Deception, 3; Religion, 4; History, 4], [], [Cha 12]) // Eberron - Rising from the Last War: 318
+supplyStats ("Shifter", 14, 19, 12, 16, 14, 11, 15, 10, [], "30 ft.", [Acrobatics, 5; Insight, 4; Nature, 2; Perception, 4], [], []) // Eberron - Rising from the Last War: 319
+supplyStats ("Tarkanan Assassin", 15, 45, 12, 16, 14, 10, 14, 11, [], "30 ft.", [Athletics, 3; Deception, 2; Perception, 4; Sleight, 5; Stealth, 5], [], [Con 12]) // Eberron - Rising from the Last War: 320
+supplyStats ("Warforged Soldier", 16, 30, 16, 12, 16, 10, 14, 11, [Advantage "poison"], "30 ft.", [Athletics, 5; Perception, 4; Survival, 4], [], []) // Eberron - Rising from the Last War: 320
 
-allMonsters |> Seq.find (fun m -> m.name = "Glabrezu")
+allMonsters |> Seq.find (fun m -> m.name = "Warforged Soldier")
+allMonsters |> Seq.choose (function { name = name; stats = Some({ advantage = a }) } when a <> null -> Some (name, a) | _ -> None) |> Array.ofSeq
+save()
+

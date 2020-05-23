@@ -1,5 +1,5 @@
 Dimensions:
-   the biggest Xanathar mob allowed, the highest-CR solo, the median mob, and a random-sized mob
+   the biggest Xanathar mob allowed, the highest-CR solo, the median mob, and a random-sized mob, or by pure solo CR
    Ability scores
    Level range
    
@@ -13,3 +13,4 @@ Settings:
    Source
    
 Show best/worst monster for each CR range
+Support URL linkage
