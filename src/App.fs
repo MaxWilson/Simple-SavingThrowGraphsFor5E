@@ -10,20 +10,34 @@ let chart (lines: Map<string, float list>) =
     let colors = [(0, 100, 80); (0, 176, 246); (231, 107, 243)]
     let mkColor ix = colors.[ix % colors.Length] |> color.rgb
     let mkFill ix = colors.[ix % colors.Length] |> (fun (x,y,z) -> color.rgba(x,y,z,0.2))
+    let hover key ix =
+        let data = lines.[key]
+        traces.scatter [
+            scatter.x ([ 1 .. (data.Length) ] |> List.map float)
+            scatter.y data
+            scatter.marker [
+                marker.color (colors.[ix % colors.Length] |> color.rgb)
+                ]
+            scatter.text ([ 1 .. (data.Length) ] |> List.map (fun i -> (sprintf "%s%d" key i)))
+            scatter.hoverinfo.text
+            scatter.showlegend false
+            scatter.hoveron.points
+            ]
     let myline key ix =
         let data = lines.[key]
         traces.scatter [
-            scatter.x [ 1 .. (data.Length) ]
+            scatter.x ([ 1 .. (data.Length) ] |> List.map float)
             scatter.y data
             scatter.line [
                 line.color (colors.[ix % colors.Length] |> color.rgb)
             ]
             scatter.mode.lines
             scatter.name key
+            scatter.hoverinfo.none
             ]
     let background key ix =
         let data = lines.[key]
-        let xs: int list = ([ 1 .. (data.Length) ] @ [ (data.Length) .. -1 .. 1 ])
+        let xs = ([ 1 .. (data.Length) ] @ [ (data.Length) .. -1 .. 1 ]) |> List.map float
         traces.scatter [
             scatter.x xs
             scatter.y ((data |> List.map ((+) 2.))@(data |> List.rev |> List.map (fun x -> x - 2.)))
@@ -34,11 +48,13 @@ let chart (lines: Map<string, float list>) =
             ]
             scatter.name key
             scatter.showlegend false
+            scatter.hoverinfo.none
         ]
     Plotly.plot [
         plot.traces [
             for name, ix in lines |> Seq.mapi(fun i (KeyValue(name,_)) -> name, i) do
                 background name ix
+                hover name ix
                 myline name ix
         ]
         plot.layout [
@@ -63,6 +79,7 @@ let chart (lines: Map<string, float list>) =
                 yaxis.ticks.outside
                 yaxis.zeroline false
             ]
+            layout.hovermode.closest
         ]
     ]
 
@@ -91,7 +108,7 @@ let setLength (s: State) =
 
 
 let init() =
-    { Count = 0; lines = lines }
+    { Count = lines |> Seq.map(fun (KeyValue(_, points)) -> points.Length) |> Seq.max; lines = lines }
 
 let update (msg: Msg) (state: State): State =
     match msg with
