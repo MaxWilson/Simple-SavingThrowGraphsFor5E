@@ -10,5 +10,6 @@ Settings:
    Party size
    Xanathar or DMG rules
    Monster type
+   Source
    
 Show best/worst monster for each CR range

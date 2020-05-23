@@ -23,7 +23,7 @@ let getSaves name (txt: string) =
         | RE "DC\s+[0-9]+\s+.+" [st] -> printfn "Unexpected: %s \n\t\tfor %s" st line
         | _ -> ()
         ]
-let annotations = creatures |> Map.map (fun name txt -> { name = name; txt = txt; saves = getSaves name txt })
+let mutable annotations = creatures |> Map.map (fun name txt -> { name = name; txt = txt; saves = getSaves name txt })
 annotations.["Bulette"].saves <- ["Strength", 16; "Dexterity", 16]
 type Row = {
     name: string
@@ -136,7 +136,7 @@ let parseRow a =
         dcCha = (v "Charisma") 
         skills = (listStat "skills")
         }
-let annotations = annotations |> Map.filter (fun _ c -> c.name.Contains "Template" |> not)
+annotations <- annotations |> Map.filter (fun _ c -> c.name.Contains "Template" |> not)
 let all = annotations |> Seq.map (fun (KeyValue(_, notes)) -> notes) |> Seq.sortBy (fun a -> a.name) |> Seq.map (parseRow) |> Array.ofSeq
 
 // have to leave this part commented out because it slows down VS intellisense perf something awful, but this is how you load Newtonsoft.Json
@@ -233,21 +233,37 @@ let mutable allMonsters =
     @ loadExt "c:\code\saves\kfc eberron last war - Monsters.csv"    
 
 let save () =
-    System.IO.File.WriteAllText(sprintf "c:\code\saves\data.json", JsonConvert.SerializeObject allMonsters)
+    System.IO.File.WriteAllText(sprintf @"c:\code\saves\data.json", JsonConvert.SerializeObject allMonsters)
 let load () =
-    allMonsters <- System.IO.File.ReadAllText(sprintf "c:\code\saves\data.json") |> JsonConvert.DeserializeObject<KoboldRow list>
+    allMonsters <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\data.json") |> JsonConvert.DeserializeObject<KoboldRow list>
 
 save() 
 load()
 let mutable currentRow = allMonsters.Head
-for m in allMonsters do
+annotations <- annotations |> Map.add "Mind Flayer Lich (Illithilich)" (annotations.["Illithilich"])
+for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
     if m.stats.IsNone then
         currentRow <- m
-        try
-            m.stats <- annotations.[m.name] |> parseRow |> Some
-            save()
-            printfn "%s OK" m.name
-        with _ -> printfn "Could not parse '%s'" m.name
+        let row = match annotations.TryFind(m.name) with
+                    | Some row -> Some row
+                    | None ->
+                        annotations |> Seq.tryPick (fun (KeyValue(name, data)) -> if name.StartsWith(Regex.Replace(m.name, " \((in lair|coven)\)", ""), System.StringComparison.InvariantCultureIgnoreCase) then Some data else None)
+        match row with
+        | Some row ->
+            try
+                m.stats <- row |> parseRow |> Some
+                save()
+                printfn "%s OK" m.name
+            with _ -> printfn "Could not parse '%s' (%s)" m.name m.source
+        | None ->
+            printfn "Could not find stats for '%s' (%s)" m.name m.source
         //
 
 allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.iter (fun m -> printfn "%s needs stats" m.name)
+annotations.["Mind Flayer"] |> parseRow
+allMonsters |> Seq.filter (fun m -> m.name = "Mind Flayer")
+save()
+allMonsters.Length
+allMonsters |> Seq.filter (fun m -> m.stats.IsNone) |> Seq.length
+annotations.["Grazz't"]
+
