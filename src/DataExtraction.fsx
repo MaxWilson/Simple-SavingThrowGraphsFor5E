@@ -47,6 +47,10 @@ type Row = {
     dcWis: int option
     dcCha: int option
     skills: (string * int) list
+    damageResistances: string
+    damageImmunities: string
+    damageVuln: string
+    conditionImmunities: string list
     }
 
 let parseRow a =
@@ -95,8 +99,13 @@ let parseRow a =
         let pattern = sprintf "\n%s: \"([^\"\r]+)\"" name
         match a.txt with
         | RE pattern [v] -> v
-        | _ -> failwithf "Couldn't parse %s '%s'" name (a.txt.Substring(0, 100))
+        | _ -> null
     let listStat name =
+        let pattern = sprintf "\n%s: \"([^\"\r]+)\"" name
+        match a.txt with
+        | RE pattern [v] -> v.Split(',') |> Seq.map(fun v -> v.Trim()) |> List.ofSeq
+        | _ -> []
+    let listIntStat name =
         let pattern = sprintf "\n%s: \"([^\"\r]+)\"" name
         match a.txt with
         | RE pattern [v] ->
@@ -134,10 +143,14 @@ let parseRow a =
         dcInt = (v "Intelligence") 
         dcWis = (v "Wisdom") 
         dcCha = (v "Charisma") 
-        skills = (listStat "skills")
+        skills = (listIntStat "skills")
+        conditionImmunities = listStat "condition_immunities"
+        damageImmunities = strStat "damage_immunities"
+        damageResistances = strStat "damage_resistances"
+        damageVuln = strStat "damage_vulnerabilities"
         }
-annotations <- annotations |> Map.filter (fun _ c -> c.name.Contains "Template" |> not)
-let all = annotations |> Seq.map (fun (KeyValue(_, notes)) -> notes) |> Seq.sortBy (fun a -> a.name) |> Seq.map (parseRow) |> Array.ofSeq
+// For entries like "Demonic Boon Template" we don't care if they can't be parsed, they won't be used anyway
+let all = annotations |> Seq.map (fun (KeyValue(_, notes)) -> notes) |> Seq.sortBy (fun a -> a.name) |> Seq.choose (fun x -> try parseRow x |> Some with _ when x.name.Contains "Template" -> None) |> Array.ofSeq
 
 // have to leave this part commented out because it slows down VS intellisense perf something awful, but this is how you load Newtonsoft.Json
 (*

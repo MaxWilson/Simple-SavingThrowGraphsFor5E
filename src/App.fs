@@ -124,7 +124,7 @@ let render (state: State) (dispatch: Msg -> unit) =
   Html.div [
     Html.button [
       prop.onClick (fun _ -> dispatch Increment)
-      prop.text "Increment"
+      prop.text "Increment!"
     ]
 
     Html.button [
