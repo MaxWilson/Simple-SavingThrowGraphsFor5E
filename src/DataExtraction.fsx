@@ -308,6 +308,7 @@ save()
 
 type SavingThrow = Str of int | Dex of int | Con of int | Int of int | Wis of int | Cha of int | MR
 type Resist = Vuln of string | Resist of string | Immune of string | Conditions of string list
+type Prof = Arcana | History | Insight | Perception | Religion
 let supplyStats args =
     let (
                 name: string,
@@ -321,9 +322,10 @@ let supplyStats args =
                 ac: int,
                 hp: int,
                 speed: string,
-                dc: SavingThrow list,
-                skills: (string * int) list,
-                resists: Resist list) = args
+                skills: (Prof * int) list,
+                resists: Resist list,
+                dc: SavingThrow list
+            ) = args
     let m = allMonsters |> Seq.find (fun m -> m.name = name)
     if m.stats.IsNone then
         m.stats <- Some {
@@ -342,23 +344,23 @@ let supplyStats args =
             hp = hp
             magicResistance = saves |> List.exists(function MR -> true | _ -> false)
             speed = speed
+            skills = skills |> List.map (fun (skill, bonus) -> skill.ToString(), bonus)
+            damageVuln = resists |> List.tryPick(function Vuln x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
+            damageResistances = resists |> List.tryPick(function Resist x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
+            damageImmunities = resists |> List.tryPick(function Immune x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
+            conditionImmunities = resists |> List.tryPick(function Conditions x -> Some x | _ -> None) |> (function Some x -> x | _ -> [])
             dcStr = dc |> List.tryPick(function Str x -> Some x | _ -> None)
             dcDex = dc |> List.tryPick(function Dex x -> Some x | _ -> None)
             dcCon = dc |> List.tryPick(function Con x -> Some x | _ -> None)
             dcInt = dc |> List.tryPick(function Int x -> Some x | _ -> None)
             dcWis = dc |> List.tryPick(function Wis x -> Some x | _ -> None)
             dcCha = dc |> List.tryPick(function Cha x -> Some x | _ -> None)
-            skills = skills
-            damageVuln = resists |> List.tryPick(function Vuln x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
-            damageResistances = resists |> List.tryPick(function Resist x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
-            damageImmunities = resists |> List.tryPick(function Immune x -> Some x | _ -> None) |> (function Some x -> x | _ -> null)
-            conditionImmunities = resists |> List.tryPick(function Conditions x -> Some x | _ -> None) |> (function Some x -> x | _ -> [])
             }
 
 supplyStats ("Giant Ice Toad", 16, 13, 14, 8, 10, 6, [], 14, 52, "30 ft.", [], [], []) // Tales from the Yawning Portal: 235
-supplyStats ("Giant Skeleton", 21, 10, 20, 4, 6, 6, [], 17, 115, "30 ft.", [], [], [Vuln "bludgeoning"; Immune "poison"; Conditions ["exhaustion"; "poisoned"]]) // Tales from the Yawning Portal: 236
-supplyStats ("Thayan Apprentice", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Tales from the Yawning Portal: 245
-supplyStats ("Acererak", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Tomb of Annihilation: 209
+supplyStats ("Giant Skeleton", 21, 10, 20, 4, 6, 6, [], 17, 115, "30 ft.", [], [Vuln "bludgeoning"; Immune "poison"; Conditions ["exhaustion"; "poisoned"]], []) // Tales from the Yawning Portal: 236
+supplyStats ("Thayan Apprentice", 10, 14, 12, 15, 13, 11, [], 12, 27, "30 ft.", [Arcana, 4], [], []) // Tales from the Yawning Portal: 245
+supplyStats ("Acererak", 13, 16, 20, 27, 21, 20, [Con 12; Int 15; Wis 12], 21, 285, "30 ft.", [Arcana, 22; History, 22; Insight, 12; Perception, 12; Religion, 15], [], []) // Tomb of Annihilation: 209
 supplyStats ("Tabaxi Ministrel", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // Tomb of Annihilation: 233
 supplyStats ("Decapus", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // The Tortle Package: 21
 supplyStats ("Geonid", strdexconintwischa, [], ac, hp, "30 ft.", [], [], []) // The Tortle Package: 22
