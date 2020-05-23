@@ -18,10 +18,11 @@ let chart (lines: Map<string, float list>) =
             scatter.marker [
                 marker.color (colors.[ix % colors.Length] |> color.rgb)
                 ]
-            scatter.text ([ 1 .. (data.Length) ] |> List.map (fun i -> (sprintf "%s%d" key i)))
+            scatter.text ([ 1 .. (data.Length) ] |> List.map (fun i -> (sprintf "%s(%.1f, %.1f)" key (float i) data.[i-1])))
             scatter.hoverinfo.text
             scatter.showlegend false
             scatter.hoveron.points
+            scatter.mode.markers
             ]
     let myline key ix =
         let data = lines.[key]
@@ -33,7 +34,7 @@ let chart (lines: Map<string, float list>) =
             ]
             scatter.mode.lines
             scatter.name key
-            scatter.hoverinfo.none
+            scatter.hoverinfo.skip
             ]
     let background key ix =
         let data = lines.[key]
@@ -48,14 +49,14 @@ let chart (lines: Map<string, float list>) =
             ]
             scatter.name key
             scatter.showlegend false
-            scatter.hoverinfo.none
+            scatter.hoverinfo.skip
         ]
     Plotly.plot [
         plot.traces [
             for name, ix in lines |> Seq.mapi(fun i (KeyValue(name,_)) -> name, i) do
+                myline name ix
                 background name ix
                 hover name ix
-                myline name ix
         ]
         plot.layout [
             layout.paperBgcolor (color.rgb(255, 255, 255))
