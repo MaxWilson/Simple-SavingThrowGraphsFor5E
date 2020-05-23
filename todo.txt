@@ -4,8 +4,11 @@ Dimensions:
    Level range
    
 Settings:
-   Saving throw vs ability check
-   Bypass Magic resistance?
-   Maximum number of monsters you can hit
+   Saving throw vs ability check vs. both
+   Bypass Magic resistance? Yes, no, or both.
+   Maximum number of monsters you can hit with spell AoE
+   Party size
+   Xanathar or DMG rules
+   Monster type
    
 Show best/worst monster for each CR range
