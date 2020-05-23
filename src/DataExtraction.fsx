@@ -40,6 +40,7 @@ type Row = {
     ac: int
     hp: int
     speed: string
+    magicResistance: bool
     dcStr: int option
     dcDex: int option
     dcCon: int option
@@ -138,6 +139,7 @@ let parseRow a =
         cha = (stat "cha") 
         ac = (intStat "armor_class") 
         hp = (intStat "hit_points") 
+        magicResistance = match a.txt with RE "(Magic Resistance)" [_] -> true | _ -> false 
         speed = (strStat "speed") 
         dcStr = (getSaveDC "Strength") 
         dcDex = (getSaveDC "Dexterity") 
@@ -198,7 +200,6 @@ let readFields (str: string) =
             let v, ix = readField str ix
             loop (acc@[v]) ix
     loop [] 0
-readFields "abc, def"
 let parseInt v = 
         match v with
         | RE "([0-9 ]+)" [raw] ->    
@@ -299,40 +300,31 @@ for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
                 printfn "%s OK" m.name
             with _ -> printfn "Could not parse '%s' (%s)" m.name m.source
         | None ->
-            printfn "supplyStats (\"%s\", , None, , None, , None, , None, , None, , None, , , \"30 ft.\", None, None, None, None, Some 15, None, [], null, null, null, []) // %s" m.name m.source
+            printfn "supplyStats (\"%s\", strdexconintwischa, [], ac, hp, \"30 ft.\", [], [], null, null, null, []) // %s" m.name m.source
         //
 
 // remove monsters that aren't real monsters deserving of a separate entry
 save()
 
+type SavingThrow = Str of int | Dex of int | Con of int | Int of int | Wis of int | Cha of int | MR
 let supplyStats args =
     let (
                 name: string,
                 str: int, 
-                strSave: int option,
                 dex: int,
-                dexSave: int option,
                 con: int,
-                conSave: int option,
                 int: int, 
-                intSave: int option,
                 wis: int,
-                wisSave: int option,
                 cha: int,
-                chaSave: int option,
+                saves: SavingThrow list,
                 ac: int,
                 hp: int,
                 speed: string,
-                dcStr: int option,
-                dcDex: int option,
-                dcCon: int option,
-                dcInt: int option,
-                dcWis: int option,
-                dcCha: int option,
+                dc: SavingThrow list,
                 skills: (string * int) list,
+                damageVuln: string,
                 damageResistances: string,
                 damageImmunities: string,
-                damageVuln: string,
                 conditionImmunities: string list) = args
     let m = allMonsters |> Seq.find (fun m -> m.name = name)
     if m.stats.IsNone then
@@ -342,73 +334,73 @@ let supplyStats args =
             Row.src = m.source
             Row.size = m.size
             Row.creatureType = m.creatureType
-            Row.str = str, strSave
-            dex = dex, dexSave
-            con = con, conSave
-            int = int, intSave
-            wis = wis, wisSave
-            cha = cha, chaSave
+            str = str, saves |> List.tryPick(function Str x -> Some x | _ -> None)
+            dex = dex, saves |> List.tryPick(function Dex x -> Some x | _ -> None)
+            con = con, saves |> List.tryPick(function Con x -> Some x | _ -> None)
+            int = int, saves |> List.tryPick(function Int x -> Some x | _ -> None)
+            wis = wis, saves |> List.tryPick(function Wis x -> Some x | _ -> None)
+            cha = cha, saves |> List.tryPick(function Cha x -> Some x | _ -> None)
             ac = ac
             hp = hp
+            magicResistance = saves |> List.exists(function MR -> true | _ -> false)
             speed = speed
-            dcStr = dcStr
-            dcDex = dcDex
-            dcCon = dcCon
-            dcInt = dcInt
-            dcWis = dcWis
-            dcCha = dcCha
+            dcStr = dc |> List.tryPick(function Str x -> Some x | _ -> None)
+            dcDex = dc |> List.tryPick(function Dex x -> Some x | _ -> None)
+            dcCon = dc |> List.tryPick(function Con x -> Some x | _ -> None)
+            dcInt = dc |> List.tryPick(function Int x -> Some x | _ -> None)
+            dcWis = dc |> List.tryPick(function Wis x -> Some x | _ -> None)
+            dcCha = dc |> List.tryPick(function Cha x -> Some x | _ -> None)
             skills = skills
+            damageVuln = damageVuln
             damageResistances = damageResistances
             damageImmunities = damageImmunities
-            damageVuln = damageVuln
             conditionImmunities = conditionImmunities
             }
 
-supplyStats ("Giant Ice Toad", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Tales from the Yawning Portal: 235
-supplyStats ("Giant Skeleton", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Tales from the Yawning Portal: 236
-supplyStats ("Thayan Apprentice", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Tales from the Yawning Portal: 245
-supplyStats ("Acererak", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Tomb of Annihilation: 209
-supplyStats ("Tabaxi Ministrel", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Tomb of Annihilation: 233
-supplyStats ("Decapus", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // The Tortle Package: 21
-supplyStats ("Geonid", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // The Tortle Package: 22
-supplyStats ("Topi", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // The Tortle Package: 22
-supplyStats ("Belashyrra", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 286
-supplyStats ("Dyrrn", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 288
-supplyStats ("Clawfoot", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 289
-supplyStats ("Fastieth", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 289
-supplyStats ("Dolgaunt", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 290
-supplyStats ("Dolgrim", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 291
-supplyStats ("Dusk Hag", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 292
-supplyStats ("Expeditious Messenger", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 293
-supplyStats ("Iron Defender", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 293
-supplyStats ("Inspired", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 294
-supplyStats ("Karrnathi Undead Soldier", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 295
-supplyStats ("Lady Illmarrow", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 297
-supplyStats ("Living Burning Hands", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 298
-supplyStats ("Living Lightning Bolt", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 299
-supplyStats ("Living Cloudkill", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 299
-supplyStats ("The Lord of Blades", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 300
-supplyStats ("Mordakhesh", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 301
-supplyStats ("Rak Tulkhesh", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 303
-supplyStats ("Sul Khatesh", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 304
-supplyStats ("Hashalaq Quori", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 305
-supplyStats ("Kalaraq Quori", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 306
-supplyStats ("Tsucora Quori", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 307
-supplyStats ("Radiant Idol", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 308
-supplyStats ("Zakya Rakshasa", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 309
-supplyStats ("Undying Councilor", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 311
-supplyStats ("Undying Soldier", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 311
-supplyStats ("Valenar Hawk", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 312
-supplyStats ("Valenar Hound", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 312
-supplyStats ("Valenar Steed", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 313
-supplyStats ("Warforged Colossus", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 314
-supplyStats ("Warforged Titan", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 315
-supplyStats ("Bone Knight", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 316
-supplyStats ("Changeling", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 317
-supplyStats ("Kalashtar", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 317
-supplyStats ("Magewright", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 318
-supplyStats ("Shifter", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 319
-supplyStats ("Tarkanan Assassin", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 320
-supplyStats ("Warforged Soldier", , None, , None, , None, , None, , None, , None, , , "30 ft.", None, None, None, None, Some 15, None, [], null, null, null, []) // Eberron - Rising from the Last War: 320
-
-
+supplyStats ("Giant Ice Toad", 16, 13, 14, 8, 10, 6, [], 14, 52, "30 ft.", [], [], null, null, null, []) // Tales from the Yawning Portal: 235
+supplyStats ("Giant Skeleton", 21, 10, 20, 4, 6, 6, [], 17, 115, "30 ft.", [], [], "bludgeoning", null, "poison", ["exhaustion"; "poisoned"]) // Tales from the Yawning Portal: 236
+supplyStats ("Thayan Apprentice", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Tales from the Yawning Portal: 245
+supplyStats ("Acererak", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Tomb of Annihilation: 209
+supplyStats ("Tabaxi Ministrel", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Tomb of Annihilation: 233
+supplyStats ("Decapus", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // The Tortle Package: 21
+supplyStats ("Geonid", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // The Tortle Package: 22
+supplyStats ("Topi", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // The Tortle Package: 22
+supplyStats ("Belashyrra", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 286
+supplyStats ("Dyrrn", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 288
+supplyStats ("Clawfoot", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 289
+supplyStats ("Fastieth", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 289
+supplyStats ("Dolgaunt", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 290
+supplyStats ("Dolgrim", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 291
+supplyStats ("Dusk Hag", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 292
+supplyStats ("Expeditious Messenger", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 293
+supplyStats ("Iron Defender", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 293
+supplyStats ("Inspired", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 294
+supplyStats ("Karrnathi Undead Soldier", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 295
+supplyStats ("Lady Illmarrow", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 297
+supplyStats ("Living Burning Hands", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 298
+supplyStats ("Living Lightning Bolt", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 299
+supplyStats ("Living Cloudkill", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 299
+supplyStats ("The Lord of Blades", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 300
+supplyStats ("Mordakhesh", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 301
+supplyStats ("Rak Tulkhesh", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 303
+supplyStats ("Sul Khatesh", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 304
+supplyStats ("Hashalaq Quori", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 305
+supplyStats ("Kalaraq Quori", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 306
+supplyStats ("Tsucora Quori", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 307
+supplyStats ("Radiant Idol", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 308
+supplyStats ("Zakya Rakshasa", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 309
+supplyStats ("Undying Councilor", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 311
+supplyStats ("Undying Soldier", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 311
+supplyStats ("Valenar Hawk", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 312
+supplyStats ("Valenar Hound", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 312
+supplyStats ("Valenar Steed", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 313
+supplyStats ("Warforged Colossus", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 314
+supplyStats ("Warforged Titan", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 315
+supplyStats ("Bone Knight", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 316
+supplyStats ("Changeling", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 317
+supplyStats ("Kalashtar", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 317
+supplyStats ("Magewright", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 318
+supplyStats ("Shifter", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 319
+supplyStats ("Tarkanan Assassin", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 320
+supplyStats ("Warforged Soldier", strdexconintwischa, [], ac, hp, "30 ft.", [], [], null, null, null, []) // Eberron - Rising from the Last War: 320
+allMonsters |> Seq.find (fun m -> m.name = "Glabrezu")
