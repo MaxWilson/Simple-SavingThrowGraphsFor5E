@@ -28,8 +28,8 @@ annotations.["Bulette"].saves <- ["Strength", 16; "Dexterity", 16]
 type Row = {
     name: string
     cr: string
-    size: string 
-    creatureType: string 
+    size: string
+    creatureType: string
     src: string
     str: int * int option
     dex: int * int option
@@ -56,9 +56,9 @@ type Row = {
     }
 
 let parseRow a =
-    let parseInt v = 
+    let parseInt v =
         match v with
-        | RE "([0-9 ]+)" [raw] ->    
+        | RE "([0-9 ]+)" [raw] ->
             match System.Int32.TryParse raw with
             | true, n -> n
             | _ -> failwithf "'%s' is not an int (%s)" v (a:Creature).name
@@ -79,17 +79,17 @@ let parseRow a =
     let size = tl.[0]
     let type' = tl.[1]
     let src = if tl.Length > 3 then tl.[3] else ""
-    let stat name = 
+    let stat name =
         let pattern = ("\n" + name + ": ([0-9]+)")
-        match a.txt with 
-        | RE pattern [raw] ->   
+        match a.txt with
+        | RE pattern [raw] ->
             let raw = parseInt raw
             let modifier = (raw + 1)/2 - 5
             match a.txt with
             | RE "saving_throws:[^\r](.*)" [sts] ->
                 let pattern = name + "\s*([+0-9 ]+)"
                 match sts with
-                | RE pattern [save] -> 
+                | RE pattern [save] ->
                     raw, Some (parseInt (save.Replace(" ", "")))
                 | _ -> raw, None
             | _ -> raw, None
@@ -113,42 +113,42 @@ let parseRow a =
         let pattern = sprintf "\n%s: \"([^\"\r]+)\"" name
         match a.txt with
         | RE pattern [v] ->
-            v.Split(',') |> Seq.choose(fun x -> 
+            v.Split(',') |> Seq.choose(fun x ->
                 match x.Trim() with
                 | RE "([a-zA-Z ]+)\s([+ \-0-9]+)" [stat; plus] -> Some(stat.Trim(), parseInt (plus.Replace(" ", "").Trim()))
                 | "plus one of the following" -> None
-                | _ -> failwithf "Could not parse '%s' as a skill" v)     
+                | _ -> failwithf "Could not parse '%s' as a skill" v)
             |> List.ofSeq
         | _ -> []
     let str = stat "str"
-    let dex = match a.txt with RE "dex: ([0-9() +\-]+)" [stat] -> stat | _ -> "" 
-    let con = match a.txt with RE "con: ([0-9() +\-]+)" [stat] -> stat | _ -> "" 
-    let int = match a.txt with RE "int: ([0-9() +\-]+)" [stat] -> stat | _ -> "" 
-    let wis = match a.txt with RE "wis: ([0-9() +\-]+)" [stat] -> stat | _ -> "" 
-    let cha = match a.txt with RE "cha: ([0-9() +\-]+)" [stat] -> stat | _ -> "" 
+    let dex = match a.txt with RE "dex: ([0-9() +\-]+)" [stat] -> stat | _ -> ""
+    let con = match a.txt with RE "con: ([0-9() +\-]+)" [stat] -> stat | _ -> ""
+    let int = match a.txt with RE "int: ([0-9() +\-]+)" [stat] -> stat | _ -> ""
+    let wis = match a.txt with RE "wis: ([0-9() +\-]+)" [stat] -> stat | _ -> ""
+    let cha = match a.txt with RE "cha: ([0-9() +\-]+)" [stat] -> stat | _ -> ""
     {
         name = a.name
         cr = cr
-        size = size 
-        creatureType = type' 
-        src = src 
-        str = (stat "str") 
-        dex = (stat "dex") 
-        con = (stat "con") 
-        int = (stat "int") 
-        wis = (stat "wis") 
-        cha = (stat "cha") 
-        ac = (intStat "armor_class") 
-        hp = (intStat "hit_points") 
-        magicResistance = match a.txt with RE "(Magic Resistance|Magic Immunity)" [_] -> true | _ -> false 
-        advantage = match a.txt with RE "advantage on (\s+) saving throws" [attr] -> "attr" | RE "advantage on saving throws against (being )?(\w+)" [_;effect] -> effect | _ -> null 
-        speed = (strStat "speed") 
-        dcStr = (getSaveDC "Strength") 
-        dcDex = (getSaveDC "Dexterity") 
-        dcCon = (getSaveDC "Constitution") 
-        dcInt = (getSaveDC "Intelligence") 
-        dcWis = (getSaveDC "Wisdom") 
-        dcCha = (getSaveDC "Charisma") 
+        size = size
+        creatureType = type'
+        src = src
+        str = (stat "str")
+        dex = (stat "dex")
+        con = (stat "con")
+        int = (stat "int")
+        wis = (stat "wis")
+        cha = (stat "cha")
+        ac = (intStat "armor_class")
+        hp = (intStat "hit_points")
+        magicResistance = match a.txt with RE "(Magic Resistance|Magic Immunity)" [_] -> true | _ -> false
+        advantage = match a.txt with RE "advantage on (\s+) saving throws" [attr] -> "attr" | RE "advantage on saving throws against (being )?(\w+)" [_;effect] -> effect | _ -> null
+        speed = (strStat "speed")
+        dcStr = (getSaveDC "Strength")
+        dcDex = (getSaveDC "Dexterity")
+        dcCon = (getSaveDC "Constitution")
+        dcInt = (getSaveDC "Intelligence")
+        dcWis = (getSaveDC "Wisdom")
+        dcCha = (getSaveDC "Charisma")
         skills = (listIntStat "skills")
         conditionImmunities = listStat "condition_immunities"
         damageImmunities = strStat "damage_immunities"
@@ -179,6 +179,7 @@ type KoboldRow = {
     legendary: bool
     unique: bool
     source: string
+    mutable sourcebook: string
     }
 
 let readField (str: string) startIx =
@@ -194,7 +195,7 @@ let readField (str: string) startIx =
         while endIx < str.Length && str.[endIx] <> ',' do endIx <- endIx + 1
         let v = str.Substring(startIx, endIx - startIx).Trim()
         v, endIx+1
-let readFields (str: string) = 
+let readFields (str: string) =
     let str = str.Replace("\"\"", "'") // don't want to deal with escaped quotes
     let rec loop acc ix =
         if ix >= str.Length then acc
@@ -202,14 +203,14 @@ let readFields (str: string) =
             let v, ix = readField str ix
             loop (acc@[v]) ix
     loop [] 0
-let parseInt v = 
+let parseInt v =
         match v with
-        | RE "([0-9 ]+)" [raw] ->    
+        | RE "([0-9 ]+)" [raw] ->
             match System.Int32.TryParse raw with
             | true, n -> n
             | _ -> failwithf "'%s' is not an integer" v
         | v -> failwithf "'%s' is not an integer" v
-    
+
 let loadKobold fileName =
     let csv = System.IO.File.ReadAllLines fileName |> Seq.skip 1 |> List.ofSeq
     [for line in csv do
@@ -228,6 +229,7 @@ let loadKobold fileName =
             legendary = not <| System.String.IsNullOrWhiteSpace legendary
             unique = not <| System.String.IsNullOrWhiteSpace unique
             source = src
+            sourcebook = null
             }
         ]
 // for some reason Rising from the Last War has fewer fields
@@ -249,13 +251,14 @@ let loadExt fileName =
             legendary = not <| System.String.IsNullOrWhiteSpace legendary
             unique = not <| System.String.IsNullOrWhiteSpace unique
             source = src
+            sourcebook = null
             }
         ]
 
 // it turns out to be convenient to define a mutable variable for the data we're working on
-let mutable allMonsters = 
-    loadKobold "c:\code\saves\kfc official - Monsters.csv"    
-    @ loadExt "c:\code\saves\kfc eberron last war - Monsters.csv"    
+let mutable allMonsters =
+    loadKobold "c:\code\saves\kfc official - Monsters.csv"
+    @ loadExt "c:\code\saves\kfc eberron last war - Monsters.csv"
 
 let save () =
     System.IO.File.WriteAllText(sprintf @"c:\code\saves\data.json", JsonConvert.SerializeObject allMonsters)
@@ -280,7 +283,7 @@ allMonsters |> Seq.find (fun m -> m.name = "Demilich (in lair)")
 allMonsters <- allMonsters |> List.map (function m when m.name = "OgrÃ©moch" -> { m with name = "Ogremoch" } | m when m.name = "Hook Horror Servant" -> { m with name = "Hook Horror Spore Servant" } | m -> m)
 
 // exclude dumb low-level campaign-specific unique NPCs while retaining unique high-level monsters that might actually show up in play
-allMonsters <- allMonsters |> List.filter (fun m -> not (m.unique && m.cr <= 8.)) 
+allMonsters <- allMonsters |> List.filter (fun m -> not (m.unique && m.cr <= 8.))
 
 let toCr = function
     | 0.125 -> "1/8"
@@ -315,12 +318,12 @@ type Prof = Arcana | History | Insight | Religion | Performance | Perception | P
 let supplyStats args =
     let (
                 name: string,
-                ac: int, 
+                ac: int,
                 hp: int,
-                str: int, 
+                str: int,
                 dex: int,
                 con: int,
-                int: int, 
+                int: int,
                 wis: int,
                 cha: int,
                 saves: SavingThrow list,
@@ -405,7 +408,18 @@ supplyStats ("Shifter", 14, 19, 12, 16, 14, 11, 15, 10, [], "30 ft.", [Acrobatic
 supplyStats ("Tarkanan Assassin", 15, 45, 12, 16, 14, 10, 14, 11, [], "30 ft.", [Athletics, 3; Deception, 2; Perception, 4; Sleight, 5; Stealth, 5], [], [Con 12]) // Eberron - Rising from the Last War: 320
 supplyStats ("Warforged Soldier", 16, 30, 16, 12, 16, 10, 14, 11, [Advantage "poison"], "30 ft.", [Athletics, 5; Perception, 4; Survival, 4], [], []) // Eberron - Rising from the Last War: 320
 
-allMonsters |> Seq.find (fun m -> m.name = "Warforged Soldier")
-allMonsters |> Seq.choose (function { name = name; stats = Some({ advantage = a }) } when a <> null -> Some (name, a) | _ -> None) |> Array.ofSeq
 save()
 
+for m in allMonsters |> Seq.filter (fun m -> m.sourcebook = null) do
+    let sources = ["Out of the Abyss"; "Princes of the Apocalypse";
+        "Hoard of the Dragon Queen"; "Rise of Tiamat"; "Monster Manual";
+        "Princes of the Apocalypse Online Supplement v1"; "Basic Rules v1";
+        "HotDQ supplement"; "Player's Handbook"; "Mordenkainen's Tome of Foes";
+        "Storm King's Thunder"; "Curse of Strahd"; "Tales from the Yawning Portal";
+        "Tomb of Annihilation"; "The Tortle Package"; "Volo's Guide to Monsters";
+        "Eberron - Rising from the Last War"]
+    match sources |> List.tryFind(fun candidate -> m.source.StartsWith candidate) with
+    | Some src -> m.sourcebook <- src
+    | None -> printfn "Not categorized: %s from %s" m.name m.source
+
+save()
