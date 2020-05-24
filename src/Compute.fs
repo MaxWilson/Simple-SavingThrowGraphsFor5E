@@ -56,7 +56,7 @@ let sources = [|"Out of the Abyss"; "Princes of the Apocalypse";
     "Tomb of Annihilation"; "The Tortle Package"; "Volo's Guide to Monsters";
     "Eberron - Rising from the Last War"|]
 let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 1. .. 30.]
-let bySrcCR = creatures |> Seq.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
+let bySrcCR = creatures |> List.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
 
 for cr in crs do
     match bySrcCR |> Map.tryFind ("Tomb of Annihilation", cr) with
@@ -64,3 +64,35 @@ for cr in crs do
         for m in monsters do
             printfn "%.2g %s" cr m.name
     | None -> ()
+
+type Encounter = (int * Header) list
+type Difficulty = Easy | Medium | Hard | Deadly | Ludicrous
+type XanatharMethod = BiggestMob | Solo | MedianMob | RandomMob | Mixed
+type ConstructionMethod = PureCR | Xanathar of XanatharMethod | DMG of Difficulty | Balanced of Difficulty
+type ConstructionSettings = {
+    sources: string list // allowed sources, e.g. Volo's, MM
+    partySize: int
+    partyLevel: int
+    creatureType: string list
+    method: ConstructionMethod
+    }
+type ConstructEncounter = ConstructionSettings -> Encounter
+type Ability = Str | Dex | Con | Int | Wis | Cha
+type DefenseMethod = Save of Ability | NonmagicalSave of Ability | Check of Ability
+type Attack = AoE of DefenseMethod * maxTargets: int * maxPercentage: float | SingleTarget of DefenseMethod
+type EvaluationLine = Evaluation of name: string * attack: Attack
+type Result = Result of percentage: float * Encounter list
+// for PureCR pcLevel actually means monster CR, and can go outside 1-20
+type LevelResult = { pcLevel: float; average: Result; best: Result; worst: Result }
+type EvaluationResponse = {
+    name: string
+    attack: Attack
+    ability: Ability
+    results: LevelResult list
+    }
+type Evaluate = ConstructEncounter -> ConstructionSettings -> EvaluationLine list -> EvaluationResponse list
+
+let eval: Evaluate = fun construct baseConstructSettings evalLines ->
+    let range = match baseConstructSettings.method with PureCR -> [0.; 0.125; 0.25; 0.5] @ [1. .. 30.] | _ -> [1. .. 20.]
+
+    failwith "Not impl"
