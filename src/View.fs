@@ -81,5 +81,13 @@ let chart (lines: Map<string, float list>) =
             layout.hovermode.closest
         ]
     ]
-let view model dispatch =
-    Html.text "placeholder"
+let view (model: Model) dispatch =
+    match model.loaded with
+    | NotStarted | InProgress -> Html.h2 "Initializing..."
+    | Resolved (Error msg) ->
+        Html.h2 [
+            prop.style [style.color.red]
+            prop.text msg
+            ]
+    | Resolved (Ok()) ->
+        Html.text "placeholder"

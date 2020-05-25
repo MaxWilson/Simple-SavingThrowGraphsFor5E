@@ -4,6 +4,8 @@ open Elmish
 open Elmish.React
 open Feliz
 open Feliz.Plotly
+open Fable.SimpleHttp
+open Model
 
 let chart (lines: Map<string, float list>) =
     let colors = [(0, 100, 80); (0, 176, 246); (231, 107, 243)]
@@ -82,7 +84,68 @@ let chart (lines: Map<string, float list>) =
             layout.hovermode.closest
         ]
     ]
+
+open Thoth.Json
+open Compute
+let statsDecoder : Decoder<Stats> =
+    let stat = (Decode.tuple2 Decode.int (Decode.option Decode.int))
+    Decode.object(fun get -> {
+        str = get.Required.At ["str"] stat
+        dex = get.Required.At ["dex"] stat
+        con = get.Required.At ["con"] stat
+        int = get.Required.At ["int"] stat
+        wis = get.Required.At ["wis"] stat
+        cha = get.Required.At ["cha"] stat
+        advantage = get.Required.At ["advantage"] Decode.string
+        ac = get.Required.At ["ac"] Decode.int
+        hp = get.Required.At ["hp"] Decode.int
+        speed = get.Required.At ["speed"] Decode.string
+        magicResistance = get.Required.At ["magicResistance"] Decode.bool
+        dcStr = get.Optional.At ["dcStr"] Decode.int
+        dcDex = get.Optional.At ["dcDex"] Decode.int
+        dcCon = get.Optional.At ["dcCon"] Decode.int
+        dcInt = get.Optional.At ["dcInt"] Decode.int
+        dcWis = get.Optional.At ["dcWis"] Decode.int
+        dcCha = get.Optional.At ["dcCha"] Decode.int
+        skills = get.Optional.At ["skills"] (Decode.list (Decode.tuple2 Decode.string Decode.int)) |> Option.defaultValue []
+        damageResistances = get.Required.At ["damageResistances"] Decode.string
+        damageImmunities = get.Required.At ["damageImmunities"] Decode.string
+        damageVuln = get.Required.At ["damageVuln"] Decode.string
+        conditionImmunities = get.Optional.At ["conditionImmunities"] (Decode.list Decode.string) |> Option.defaultValue []
+    })
+let headerDecode : Decoder<Header> =
+    Decode.object(fun get -> {
+        Compute.Header.name = get.Required.At ["name"] Decode.string
+        stats = get.Required.At ["name"] statsDecoder
+        cr = get.Required.At ["cr"] Decode.float
+        size = get.Required.At ["size"] Decode.string
+        creatureType = get.Required.At ["creatureType"] Decode.string
+        tags = get.Required.At ["tags"] (Decode.list Decode.string)
+        alignment = get.Required.At ["alignment"] Decode.string
+        ac = get.Required.At ["ac"] Decode.int
+        hp = get.Required.At ["hp"] Decode.int
+        legendary = get.Required.At ["legendary"] Decode.bool
+        unique = get.Required.At ["unique"] Decode.bool
+        source = get.Required.At ["source"] Decode.string
+        sourcebook = get.Required.At ["sourcebook"] Decode.string
+        })
+
 open App
 Program.mkSimple init update view
+|> Program.withSubscription (fun model ->
+    Cmd.OfAsync.result (
+        async {
+            let! (statusCode, responseText) = Http.get "/data.json"
+            if statusCode = 200 then
+                match Thoth.Json.Decode.Auto.fromString<Compute.Header array>(responseText) with
+                | Ok creatures ->
+                    Compute.initialize creatures
+                    return LoadCreatures(Finished (Ok()))
+                | Error msg ->
+                    return LoadCreatures(Finished (Error msg))
+            else
+                return LoadCreatures(Finished(Error "Could not download creature data"))
+        }
+    ))
 |> Program.withReactSynchronous "elmish-app"
 |> Program.run

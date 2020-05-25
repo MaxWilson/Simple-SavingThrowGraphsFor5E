@@ -261,9 +261,9 @@ let mutable allMonsters =
     @ loadExt "c:\code\saves\kfc eberron last war - Monsters.csv"
 
 let save () =
-    System.IO.File.WriteAllText(sprintf @"c:\code\saves\data.json", JsonConvert.SerializeObject allMonsters)
+    System.IO.File.WriteAllText(sprintf @"c:\code\saves\dist\data.json", JsonConvert.SerializeObject allMonsters)
 let load () =
-    allMonsters <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\data.json") |> JsonConvert.DeserializeObject<KoboldRow list>
+    allMonsters <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\dist\data.json") |> JsonConvert.DeserializeObject<KoboldRow list>
 
 let mutable currentRow = allMonsters.Head
 let correct name src =
