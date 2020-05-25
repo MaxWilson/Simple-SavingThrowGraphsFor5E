@@ -40,14 +40,8 @@ type Header = {
     sourcebook: string
     }
 
-let mutable creatures: Header list = []
-#if INTERACTIVE
-#r "nuget: Newtonsoft.Json"
-open Newtonsoft.Json
-creatures <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\data.json") |> JsonConvert.DeserializeObject<Header list>
-#endif
-
-let byName = creatures |> Seq.map (fun m -> m.name, m) |> Map.ofSeq
+let mutable creatures: Header array = [||]
+let mutable byName = creatures |> Seq.map (fun m -> m.name, m) |> Map.ofSeq
 let sources = [|"Out of the Abyss"; "Princes of the Apocalypse";
     "Hoard of the Dragon Queen"; "Rise of Tiamat"; "Monster Manual";
     "Princes of the Apocalypse Online Supplement v1"; "Basic Rules v1";
@@ -56,14 +50,20 @@ let sources = [|"Out of the Abyss"; "Princes of the Apocalypse";
     "Tomb of Annihilation"; "The Tortle Package"; "Volo's Guide to Monsters";
     "Eberron - Rising from the Last War"|]
 let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 1. .. 30.]
-let bySrcCR = creatures |> List.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
+let mutable byCR = creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
+let mutable bySrcCR = creatures |> Array.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
+let initialize input =
+    creatures <- input
+    byName <- creatures |> Seq.map (fun m -> m.name, m) |> Map.ofSeq
+    byName <- creatures |> Seq.map (fun m -> m.name, m) |> Map.ofSeq
+    byCR <- creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
+    bySrcCR <- creatures |> Array.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
+#if INTERACTIVE
+#r "nuget: Newtonsoft.Json"
+open Newtonsoft.Json
+initialize (System.IO.File.ReadAllText(sprintf @"c:\code\saves\data.json") |> JsonConvert.DeserializeObject<Header array>)
+#endif
 
-for cr in crs do
-    match bySrcCR |> Map.tryFind ("Tomb of Annihilation", cr) with
-    | Some monsters ->
-        for m in monsters do
-            printfn "%.2g %s" cr m.name
-    | None -> ()
 
 type Encounter = (int * Header) list
 type Difficulty = Easy | Medium | Hard | Deadly | Ludicrous
@@ -72,11 +72,10 @@ type ConstructionMethod = PureCR | Xanathar of XanatharMethod | DMG of Difficult
 type ConstructionSettings = {
     sources: string list // allowed sources, e.g. Volo's, MM
     partySize: int
-    partyLevel: int
     creatureType: string list
     method: ConstructionMethod
     }
-type ConstructEncounter = ConstructionSettings -> Encounter
+type ConstructEncounter = ConstructionSettings -> (*partyLevel*) float -> (* number of encounters *) int -> Encounter list
 type Ability = Str | Dex | Con | Int | Wis | Cha
 type DefenseMethod = Save of Ability | NonmagicalSave of Ability | Check of Ability
 type Attack = AoE of DefenseMethod * maxTargets: int * maxPercentage: float | SingleTarget of DefenseMethod
@@ -92,7 +91,39 @@ type EvaluationResponse = {
     }
 type Evaluate = ConstructEncounter -> ConstructionSettings -> EvaluationLine list -> EvaluationResponse list
 
-let eval: Evaluate = fun construct baseConstructSettings evalLines ->
-    let range = match baseConstructSettings.method with PureCR -> [0.; 0.125; 0.25; 0.5] @ [1. .. 30.] | _ -> [1. .. 20.]
+let eval: Evaluate = fun construct constructSettings evalLines ->
+    let range = match constructSettings.method with PureCR -> [0.; 0.125; 0.25; 0.5] @ [1. .. 30.] | _ -> [1. .. 20.]
+    let N = 1000
+    let encountersByLevel = range |> Seq.map(fun level -> level, construct constructSettings level N) |> Map.ofSeq
+    let abilityOfDefense = function Save v | NonmagicalSave v | Check v -> v
+    let calculateEffectiveness (a: Attack) (e: Encounter) : float =
+        let effectiveness = 50.
+        effectiveness
+    [for Evaluation(name, attack) in evalLines do
+        {
+        EvaluationResponse.name = name
+        attack = attack
+        ability = match attack with AoE(d, _, _) | SingleTarget d -> abilityOfDefense d
+        results = [for level in range do
+                    let encounters = encountersByLevel.[level]
+                    let by f =
+                            let c = (calculateEffectiveness attack)
+                            let e = encounters |> f c
+                            in Result(c e, [e])
+                    if not encounters.IsEmpty then {
+                        pcLevel = level
+                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness attack), encounters)
+                        best = by Seq.maxBy
+                        worst = by Seq.minBy
+                        }
+                    ]
+        }]
 
-    failwith "Not impl"
+let r = System.Random()
+let chooseFrom (choices: 't array) = choices.[r.Next choices.Length]
+let constructPureCR : ConstructEncounter =
+    fun (settings: ConstructionSettings) cr N ->
+        let creatures = byCR.[cr] |> Array.filter (fun (m:Header) -> settings.sources |> List.exists((=) m.sourcebook))
+        [for n in 1..N do
+            [1, chooseFrom creatures]
+            ]
