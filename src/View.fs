@@ -1,7 +1,6 @@
-module Main
+﻿module View
 
-open Elmish
-open Elmish.React
+open Model
 open Feliz
 open Feliz.Plotly
 
@@ -82,7 +81,5 @@ let chart (lines: Map<string, float list>) =
             layout.hovermode.closest
         ]
     ]
-open App
-Program.mkSimple init update view
-|> Program.withReactSynchronous "elmish-app"
-|> Program.run
+let view model dispatch =
+    Html.text "placeholder"

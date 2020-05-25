@@ -5,6 +5,8 @@
   <ItemGroup>
     <None Include="DataExtraction.fsx" />
     <Compile Include="Compute.fs" />
+    <Compile Include="Model.fs" />
+    <Compile Include="View.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

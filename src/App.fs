@@ -1,23 +1,29 @@
 ﻿module App
 
 open Compute
-type 't AsyncOperationStatus = Started | Finished of 't
-type 't Deferred = NotStarted | InProgress | Resolved of 't
-type AttackType = Save | Check | NonmagicalSave
-type EvaluationSettings = {
-    abilities: Ability list
-    attackType: AttackType list
+open Model
+open View
+
+let init _ =
+    {
+    constructSettings = { ConstructionSettings.creatureType = []; ConstructionSettings.sources = sources |> List.ofArray; ConstructionSettings.method = PureCR; ConstructionSettings.partySize = 4 }
+    evalSettings = {
+        abilities = [Str; Dex; Con; Int; Wis; Cha]
+        attackType = [Save]
+        }
+    loaded = NotStarted
+    analysis = NotStarted
     }
-type Graph = {
-    settings: ConstructionSettings * EvaluationSettings
-    results: EvaluationResponse
-    }
-type Model = {
-    constructSettings: ConstructionSettings
-    evalSettings: EvaluationSettings
-    loaded: Deferred<Result<unit, string>>
-    analysis: Deferred<Graph>
-    }
-type Msg =
-    | LoadCreatures of AsyncOperationStatus<Header array>
-    | Evaluate of AsyncOperationStatus<Graph>
+let update msg model =
+    match msg with
+    | LoadCreatures(Started) ->
+        { model with loaded = InProgress }
+    | LoadCreatures(Finished v) ->
+        { model with loaded = Resolved(v) }
+    | Evaluate(Started) ->
+        { model with analysis = InProgress }
+    | Evaluate(Finished v) ->
+        { model with analysis = Resolved(v) }
+
+let view = view
+
