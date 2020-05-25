@@ -96,7 +96,7 @@ let statsDecoder : Decoder<Stats> =
         int = get.Required.At ["int"] stat
         wis = get.Required.At ["wis"] stat
         cha = get.Required.At ["cha"] stat
-        advantage = get.Required.At ["advantage"] Decode.string
+        advantage = get.Optional.At ["advantage"] Decode.string |> Option.defaultValue null
         ac = get.Required.At ["ac"] Decode.int
         hp = get.Required.At ["hp"] Decode.int
         speed = get.Required.At ["speed"] Decode.string
@@ -108,15 +108,15 @@ let statsDecoder : Decoder<Stats> =
         dcWis = get.Optional.At ["dcWis"] Decode.int
         dcCha = get.Optional.At ["dcCha"] Decode.int
         skills = get.Optional.At ["skills"] (Decode.list (Decode.tuple2 Decode.string Decode.int)) |> Option.defaultValue []
-        damageResistances = get.Required.At ["damageResistances"] Decode.string
-        damageImmunities = get.Required.At ["damageImmunities"] Decode.string
-        damageVuln = get.Required.At ["damageVuln"] Decode.string
+        damageResistances = get.Optional.At ["damageResistances"] Decode.string |> Option.defaultValue null
+        damageImmunities = get.Optional.At ["damageImmunities"] Decode.string |> Option.defaultValue null
+        damageVuln = get.Optional.At ["damageVuln"] Decode.string |> Option.defaultValue null
         conditionImmunities = get.Optional.At ["conditionImmunities"] (Decode.list Decode.string) |> Option.defaultValue []
     })
-let headerDecode : Decoder<Header> =
+let headerDecoder : Decoder<Header> =
     Decode.object(fun get -> {
-        Compute.Header.name = get.Required.At ["name"] Decode.string
-        stats = get.Required.At ["name"] statsDecoder
+        Header.name = get.Required.At ["name"] Decode.string
+        stats = get.Required.At ["stats"] statsDecoder
         cr = get.Required.At ["cr"] Decode.float
         size = get.Required.At ["size"] Decode.string
         creatureType = get.Required.At ["creatureType"] Decode.string
@@ -127,7 +127,7 @@ let headerDecode : Decoder<Header> =
         legendary = get.Required.At ["legendary"] Decode.bool
         unique = get.Required.At ["unique"] Decode.bool
         source = get.Required.At ["source"] Decode.string
-        sourcebook = get.Required.At ["sourcebook"] Decode.string
+        sourcebook = get.Optional.At ["sourcebook"] Decode.string |> Option.defaultValue null
         })
 
 open App
@@ -135,12 +135,12 @@ Program.mkSimple init update view
 |> Program.withSubscription (fun model ->
     Cmd.OfAsync.result (
         async {
-            let! (statusCode, responseText) = Http.get "/data.json"
+            let! (statusCode, responseText) = Http.get "/creatures.json"
             if statusCode = 200 then
-                match Thoth.Json.Decode.Auto.fromString<Compute.Header array>(responseText) with
+                match Thoth.Json.Decode.fromString (Decode.array headerDecoder) (responseText) with
                 | Ok creatures ->
                     Compute.initialize creatures
-                    return LoadCreatures(Finished (Ok()))
+                    return LoadCreatures(Finished (Ok creatures))
                 | Error msg ->
                     return LoadCreatures(Finished (Error msg))
             else

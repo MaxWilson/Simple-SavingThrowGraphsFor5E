@@ -11,15 +11,15 @@ let init _ =
         abilities = [Str; Dex; Con; Int; Wis; Cha]
         attackType = [Save]
         }
-    loaded = NotStarted
+    creatures = NotStarted
     analysis = NotStarted
     }
 let update msg model =
     match msg with
     | LoadCreatures(Started) ->
-        { model with loaded = InProgress }
+        { model with creatures = InProgress }
     | LoadCreatures(Finished v) ->
-        { model with loaded = Resolved(v) }
+        { model with creatures = Resolved(v) }
     | Evaluate(Started) ->
         { model with analysis = InProgress }
     | Evaluate(Finished v) ->

@@ -15,10 +15,10 @@ type Graph = {
 type Model = {
     constructSettings: ConstructionSettings
     evalSettings: EvaluationSettings
-    loaded: Deferred<Result<unit, string>>
+    creatures: Deferred<Result<Header array, string>>
     analysis: Deferred<Graph>
     }
 type Msg =
-    | LoadCreatures of AsyncOperationStatus<Result<unit, string>>
+    | LoadCreatures of AsyncOperationStatus<Result<Header array, string>>
     | Evaluate of AsyncOperationStatus<Graph>
 

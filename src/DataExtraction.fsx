@@ -1,30 +1,6 @@
 ﻿open System
 open System.IO
 open System.Text.RegularExpressions
-let files = System.IO.Directory.EnumerateFiles """c:\code\bestiary\_creatures"""
-let (|RE|_|) pattern str =
-    match Regex.Match(str, pattern, RegexOptions.IgnoreCase) with
-    | m when m.Success -> [for x in m.Groups -> x.Value] |> List.filter (not << System.String.IsNullOrWhiteSpace) |> List.tail|> Some
-    | _ -> None
-
-type ParseErr = { line: string; err: string }
-type Creature = { name: string; txt: string; mutable saves: (string * int) list }
-let ptags = "tags:\s*\[([\w\s ,]+)"
-let pname = "name:\s*\"([\w '()\-,'/]+)\""
-let creatures = files |> Seq.map System.IO.File.ReadAllText |> Seq.map (function RE pname [name] as txt -> name, txt | txt -> printfn "%s" txt; failwithf "No match for %s" (txt.Substring(0, 50))) |>  Map.ofSeq
-
-let getSaves name (txt: string) =
-    let lines = txt.Split('\n')
-
-    [for line in txt.Split '\n' do
-        match line with
-        | RE "DC\s+([0-9]+)\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) saving throw" [dc;st] -> st, System.Int32.Parse dc
-        | RE "DC\s+([0-9]+)\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) savng throw" [dc;st] -> st, System.Int32.Parse dc
-        | RE "DC\s+[0-9]+\s+.+" [st] -> printfn "Unexpected: %s \n\t\tfor %s" st line
-        | _ -> ()
-        ]
-let mutable annotations = creatures |> Map.map (fun name txt -> { name = name; txt = txt; saves = getSaves name txt })
-annotations.["Bulette"].saves <- ["Strength", 16; "Dexterity", 16]
 type Row = {
     name: string
     cr: string
@@ -54,6 +30,47 @@ type Row = {
     damageVuln: string
     conditionImmunities: string list
     }
+type KoboldRow = {
+    name: string
+    mutable stats: Row option
+    cr: float
+    size: string
+    creatureType: string
+    tags: string list
+    alignment: string
+    ac: int
+    hp: int
+    legendary: bool
+    unique: bool
+    source: string
+    mutable sourcebook: string
+    }
+
+
+let files = System.IO.Directory.EnumerateFiles """c:\code\bestiary\_creatures"""
+let (|RE|_|) pattern str =
+    match Regex.Match(str, pattern, RegexOptions.IgnoreCase) with
+    | m when m.Success -> [for x in m.Groups -> x.Value] |> List.filter (not << System.String.IsNullOrWhiteSpace) |> List.tail|> Some
+    | _ -> None
+
+type ParseErr = { line: string; err: string }
+type Creature = { name: string; txt: string; mutable saves: (string * int) list }
+let ptags = "tags:\s*\[([\w\s ,]+)"
+let pname = "name:\s*\"([\w '()\-,'/]+)\""
+let creatures = files |> Seq.map System.IO.File.ReadAllText |> Seq.map (function RE pname [name] as txt -> name, txt | txt -> printfn "%s" txt; failwithf "No match for %s" (txt.Substring(0, 50))) |>  Map.ofSeq
+
+let getSaves name (txt: string) =
+    let lines = txt.Split('\n')
+
+    [for line in txt.Split '\n' do
+        match line with
+        | RE "DC\s+([0-9]+)\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) saving throw" [dc;st] -> st, System.Int32.Parse dc
+        | RE "DC\s+([0-9]+)\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) savng throw" [dc;st] -> st, System.Int32.Parse dc
+        | RE "DC\s+[0-9]+\s+.+" [st] -> printfn "Unexpected: %s \n\t\tfor %s" st line
+        | _ -> ()
+        ]
+let mutable annotations = creatures |> Map.map (fun name txt -> { name = name; txt = txt; saves = getSaves name txt })
+annotations.["Bulette"].saves <- ["Strength", 16; "Dexterity", 16]
 
 let parseRow a =
     let parseInt v =
@@ -166,21 +183,6 @@ open Newtonsoft.Json
 
 System.IO.File.WriteAllText(@"c:\code\saves\annotations.json", all |> JsonConvert.SerializeObject)
 
-type KoboldRow = {
-    name: string
-    mutable stats: Row option
-    cr: float
-    size: string
-    creatureType: string
-    tags: string list
-    alignment: string
-    ac: int
-    hp: int
-    legendary: bool
-    unique: bool
-    source: string
-    mutable sourcebook: string
-    }
 
 let readField (str: string) startIx =
     let mutable startIx = startIx
@@ -261,9 +263,9 @@ let mutable allMonsters =
     @ loadExt "c:\code\saves\kfc eberron last war - Monsters.csv"
 
 let save () =
-    System.IO.File.WriteAllText(sprintf @"c:\code\saves\dist\data.json", JsonConvert.SerializeObject allMonsters)
+    System.IO.File.WriteAllText(sprintf @"c:\code\saves\data.json", JsonConvert.SerializeObject allMonsters)
 let load () =
-    allMonsters <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\dist\data.json") |> JsonConvert.DeserializeObject<KoboldRow list>
+    allMonsters <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\data.json") |> JsonConvert.DeserializeObject<KoboldRow list>
 
 let mutable currentRow = allMonsters.Head
 let correct name src =
@@ -423,3 +425,12 @@ for m in allMonsters |> Seq.filter (fun m -> m.sourcebook = null) do
     | None -> printfn "Not categorized: %s from %s" m.name m.source
 
 save()
+
+// remove the stupid Tortle stuff
+allMonsters <- allMonsters |> List.filter (fun m -> m.stats.IsSome)
+
+// #r "nuget: Thoth.Json.Net"
+// open Thoth.Json.Net
+// put the data in a format that we can easily parse at runtime (Thoth, not Newtonsoft)
+Encode.Auto.toString(0,allMonsters) |> fun json -> System.IO.File.WriteAllText(@"c:\code\saves\dist\creatures.json", json)
+

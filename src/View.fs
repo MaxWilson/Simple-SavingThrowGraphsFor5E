@@ -82,12 +82,12 @@ let chart (lines: Map<string, float list>) =
         ]
     ]
 let view (model: Model) dispatch =
-    match model.loaded with
+    match model.creatures with
     | NotStarted | InProgress -> Html.h2 "Initializing..."
     | Resolved (Error msg) ->
         Html.h2 [
             prop.style [style.color.red]
             prop.text msg
             ]
-    | Resolved (Ok()) ->
-        Html.text "placeholder"
+    | Resolved (Ok creatures) ->
+        Html.text (sprintf "Loaded %d creatures" creatures.Length)
