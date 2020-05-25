@@ -77,9 +77,9 @@ type ConstructionSettings = {
     }
 type ConstructEncounter = ConstructionSettings -> (*partyLevel*) float -> (* number of encounters *) int -> Encounter list
 type Ability = Str | Dex | Con | Int | Wis | Cha
-type DefenseMethod = Save of Ability | NonmagicalSave of Ability | Check of Ability
+type DefenseMethod = Save | NonmagicalSave | Check
 type Attack = AoE of DefenseMethod * maxTargets: int * maxPercentage: float | SingleTarget of DefenseMethod
-type EvaluationLine = Evaluation of name: string * attack: Attack
+type EvaluationLine = Evaluation of name: string * attack: Attack * Ability
 type Result = Result of percentage: float * Encounter list
 // for PureCR pcLevel actually means monster CR, and can go outside 1-20
 type LevelResult = { pcLevel: float; average: Result; best: Result; worst: Result }
@@ -95,24 +95,75 @@ let eval: Evaluate = fun construct constructSettings evalLines ->
     let range = match constructSettings.method with PureCR -> [0.; 0.125; 0.25; 0.5] @ [1. .. 30.] | _ -> [1. .. 20.]
     let N = 1000
     let encountersByLevel = range |> Seq.map(fun level -> level, construct constructSettings level N) |> Map.ofSeq
-    let abilityOfDefense = function Save v | NonmagicalSave v | Check v -> v
-    let calculateEffectiveness (a: Attack) (e: Encounter) : float =
-        let effectiveness = 50.
+    let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : float =
+        let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
+        let effectivenessOfDefense (m: Header) defense =
+            let save (stat, save) =
+                match save with
+                        | Some v -> v
+                        | None -> (stat) / 2 - 5
+            let stat (stat, _) = stat
+            let ab = match ability with
+                        | Str -> m.stats.str
+                        | Dex -> m.stats.dex
+                        | Con -> m.stats.con
+                        | Int -> m.stats.int
+                        | Wis -> m.stats.wis
+                        | Cha -> m.stats.cha
+            let hasAdvantage =
+                if m.stats.advantage = null then false
+                else
+                    let adv txt = m.stats.advantage.ToLowerInvariant().Contains(txt)
+                    match ability with
+                        | Str -> adv "strength"
+                        | Dex -> adv "dexterity"
+                        | Con -> adv "constitution"
+                        | Int -> adv "intelligence"
+                        | Wis -> adv "wisdom"
+                        | Cha -> adv "charisma"
+            let success bonus dc =
+                min 1. (max 0. (float (20 - bonus) / 20.))
+            let sq v = v * v
+            match defense with
+            | Save when m.stats.magicResistance ->
+                (success (save ab) dc) |> sq
+            | Save | NonmagicalSave ->
+                if hasAdvantage then
+                    (success (save ab) dc) |> sq
+                else
+                    (success (save ab) dc)
+            | Check -> success (stat ab) dc
+        let numberAffected = encounter |> List.sumBy(fun (n,m) ->
+            match a with
+            | SingleTarget d -> effectivenessOfDefense m d
+            | AoE(d, maxTargets, maxPct) -> effectivenessOfDefense m d * (min (float n * maxPct/100.) (float maxTargets))
+            )
+        let effectiveness = (float numberOfMonsters)/numberAffected
         effectiveness
-    [for Evaluation(name, attack) in evalLines do
+    [for Evaluation(name, attack, ability) in evalLines do
         {
         EvaluationResponse.name = name
         attack = attack
-        ability = match attack with AoE(d, _, _) | SingleTarget d -> abilityOfDefense d
+        ability = ability
         results = [for level in range do
+                    // assume maxed stats + prof
+                    let dc =
+                        match level with
+                        | n when n <= 3. -> 13
+                        | n when n <= 4. -> 14
+                        | n when n <= 7. -> 15
+                        | n when n <= 8. -> 16
+                        | n when n <= 12. -> 17
+                        | n when n <= 16. -> 18
+                        | n -> 19
                     let encounters = encountersByLevel.[level]
                     let by f =
-                            let c = (calculateEffectiveness attack)
+                            let c = (calculateEffectiveness attack ability dc)
                             let e = encounters |> f c
                             in Result(c e, [e])
                     if not encounters.IsEmpty then {
                         pcLevel = level
-                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness attack), encounters)
+                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness attack ability dc), encounters)
                         best = by Seq.maxBy
                         worst = by Seq.minBy
                         }
@@ -123,7 +174,10 @@ let r = System.Random()
 let chooseFrom (choices: 't array) = choices.[r.Next choices.Length]
 let constructPureCR : ConstructEncounter =
     fun (settings: ConstructionSettings) cr N ->
-        let creatures = byCR.[cr] |> Array.filter (fun (m:Header) -> settings.sources |> List.exists((=) m.sourcebook))
+        let creatures = byCR.[cr] |> Array.filter (fun (m:Header) ->
+            settings.sources |> List.exists((=) m.sourcebook)
+            && (settings.creatureType.IsEmpty
+                || settings.creatureType |> List.exists((=)m.creatureType)))
         [for n in 1..N do
             [1, chooseFrom creatures]
             ]
