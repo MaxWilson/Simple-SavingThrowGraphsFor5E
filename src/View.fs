@@ -5,11 +5,6 @@ open Feliz
 open Feliz.Plotly
 open Feliz.Bulma
 
-
-type Msg =
-    | LoadCreatures of AsyncOperationStatus<Result<Header array, string>>
-    | Evaluate of AsyncOperationStatus<Result<Graph, string>>
-
 module Settings =
     let view (model: Model) dispatch =
         ()

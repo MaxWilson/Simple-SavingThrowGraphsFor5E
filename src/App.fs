@@ -2,7 +2,6 @@
 
 open Compute
 open Model
-open View
 open Elmish
 open Fable.SimpleHttp
 open Thoth.Json
@@ -47,6 +46,3 @@ let update msg model =
             })
     | Evaluate(Finished v) ->
         { model with analysis = Resolved(v) }, Cmd.Empty
-
-let view = view
-

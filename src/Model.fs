@@ -14,3 +14,7 @@ type Model = {
     analysis: Deferred<Result<Graph, string>>
     }
 
+type Msg =
+    | LoadCreatures of AsyncOperationStatus<Result<Header array, string>>
+    | Evaluate of AsyncOperationStatus<Result<Graph, string>>
+
