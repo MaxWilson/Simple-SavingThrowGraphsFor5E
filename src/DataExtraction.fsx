@@ -432,5 +432,5 @@ allMonsters <- allMonsters |> List.filter (fun m -> m.stats.IsSome)
 // #r "nuget: Thoth.Json.Net"
 // open Thoth.Json.Net
 // put the data in a format that we can easily parse at runtime (Thoth, not Newtonsoft)
-Encode.Auto.toString(0,allMonsters) |> fun json -> System.IO.File.WriteAllText(@"c:\code\saves\dist\creatures.json", json)
+Encode.Auto.toString(0,allMonsters) |> fun json -> System.IO.File.WriteAllText(@"c:\code\saves\public\creatures.json", json)
 
