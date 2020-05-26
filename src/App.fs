@@ -97,8 +97,11 @@ let update msg model =
 
                 ]
             do! Async.Sleep 100
-            let evalResps = Compute.eval Compute.constructPureCR model.constructSettings (linesOf model.evalSettings)
-            return Evaluate(Finished { settings = model.constructSettings, model.evalSettings; results = evalResps })
+            try
+                let evalResps = Compute.eval Compute.constructPureCR model.constructSettings (linesOf model.evalSettings)
+                return Evaluate(Finished (Ok { settings = model.constructSettings, model.evalSettings; results = evalResps }))
+            with e ->
+                return Evaluate(Finished (Error ("Something went wrong" + e.ToString())))
             })
     | Evaluate(Finished v) ->
         { model with analysis = Resolved(v) }, Cmd.Empty

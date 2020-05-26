@@ -83,7 +83,7 @@ let chart (lines: Map<string, float list>) =
     ]
 type Msg =
     | LoadCreatures of AsyncOperationStatus<Result<Header array, string>>
-    | Evaluate of AsyncOperationStatus<Graph>
+    | Evaluate of AsyncOperationStatus<Result<Graph, string>>
 let view (model: Model) dispatch =
     match model.creatures with
     | NotStarted | InProgress -> Html.h2 "Initializing..."
@@ -96,7 +96,7 @@ let view (model: Model) dispatch =
         match model.analysis with
         | NotStarted ->
             Html.div [
-                Html.text (sprintf "Loaded %d creatures" creatures.Length)
+                Html.text (sprintf "Loaded %d creatures." creatures.Length)
                 Html.button [
                     prop.onClick (fun ev ->
                                     Evaluate Started |> dispatch
@@ -106,7 +106,12 @@ let view (model: Model) dispatch =
                 ]
         | InProgress ->
             Html.text "Please wait, analyzing..."
-        | Resolved graph ->
+        | Resolved (Error msg) ->
+            Html.h2 [
+                prop.style [style.color.red]
+                prop.text msg
+                ]
+        | Resolved (Ok graph) ->
             let results = graph.results
             let colorOf (attr: Compute.Ability) background =
                 let r,g,b =

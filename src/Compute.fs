@@ -93,7 +93,7 @@ type Evaluate = ConstructEncounter -> ConstructionSettings -> EvaluationLine lis
 
 let eval: Evaluate = fun construct constructSettings evalLines ->
     let range = match constructSettings.method with PureCR -> [0.; 0.125; 0.25; 0.5] @ [1. .. 30.] | _ -> [1. .. 20.]
-    let N = 1000
+    let N = 10
     let encountersByLevel = range |> Seq.map(fun level -> level, construct constructSettings level N) |> Map.ofSeq
     let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : float =
         let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
@@ -174,10 +174,15 @@ let r = System.Random()
 let chooseFrom (choices: 't array) = choices.[r.Next choices.Length]
 let constructPureCR : ConstructEncounter =
     fun (settings: ConstructionSettings) cr N ->
-        let creatures = byCR.[cr] |> Array.filter (fun (m:Header) ->
-            settings.sources |> List.exists((=) m.sourcebook)
-            && (settings.creatureType.IsEmpty
-                || settings.creatureType |> List.exists((=)m.creatureType)))
+        let creatures =
+            match byCR |> Map.tryFind cr with
+            | Some creatures ->
+                creatures |> Array.filter (fun (m:Header) ->
+                    settings.sources |> List.exists((=) m.sourcebook)
+                    && (settings.creatureType.IsEmpty
+                        || settings.creatureType |> List.exists((=)m.creatureType)))
+            | None -> Array.empty
         [for n in 1..N do
-            [1, chooseFrom creatures]
+            if creatures.Length > 0 then
+                [1, chooseFrom creatures]
             ]

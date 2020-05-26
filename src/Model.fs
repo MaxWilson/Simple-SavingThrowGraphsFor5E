@@ -15,6 +15,6 @@ type Model = {
     constructSettings: ConstructionSettings
     evalSettings: EvaluationSettings
     creatures: Deferred<Result<Header array, string>>
-    analysis: Deferred<Graph>
+    analysis: Deferred<Result<Graph, string>>
     }
 
