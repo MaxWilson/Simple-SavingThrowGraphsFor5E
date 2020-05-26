@@ -121,7 +121,7 @@ module Graph =
 let view (model: Model) dispatch =
     Bulma.section [
         Bulma.container [
-            Bulma.title.h2 "Saving throw analyzer for monsters"]
+            Bulma.title.h2 "Which monster saving throws are best to target?"]
         match model.creatures with
         | NotStarted | InProgress -> Html.h2 "Initializing..."
         | Resolved (Error msg) ->
