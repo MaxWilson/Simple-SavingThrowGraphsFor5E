@@ -265,3 +265,70 @@ let constructPureCR : ConstructEncounter =
             | None -> Array.empty
         // 1 of each creature at each CR, ignoring N
         List.ofArray (creatures |> Array.map (fun m -> [1, m]))
+
+let constructXanathar : ConstructEncounter =
+    let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 30.]
+    let row start values =
+        let mk ratios =
+            let hds = crs |> List.take (List.length ratios)
+            let m = List.zip hds ratios |> Map.ofList
+            fun cr -> m |> Map.tryFind cr
+        match start with
+        | (1,8) -> [1,12]@values |> mk
+        | (1,1) -> [1,12;1,12;1,12;1,12]@values |> mk
+        | (2,1) -> [1,12;1,12;1,12;1,12;1,12]@values |> mk
+        | _ -> fun _ -> None
+    let table =
+        let rows = Map.ofList [
+                1, row (1,8) [1,2;1,1;3,1;5,1]
+                2, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                3, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                4, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                5, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                6, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                7, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                8, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                9, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                10, row (1,8) [1,3;1,2;1,1;3,1;6,1]
+                11, row (1,1) [1,3;1,2;1,1;3,1;6,1]
+                12, row (1,1) [1,3;1,2;1,1;3,1;6,1]
+                13, row (1,1) [1,3;1,2;1,1;3,1;6,1]
+                14, row (1,1) [1,3;1,2;1,1;3,1;6,1]
+                15, row (1,1) [1,3;1,2;1,1;3,1;6,1]
+                16, row (2,1) [1,3;1,2;1,1;3,1;6,1]
+                17, row (2,1) [1,3;1,2;1,1;3,1;6,1]
+                18, row (2,1) [1,3;1,2;1,1;3,1;6,1]
+                19, row (2,1) [1,3;1,2;1,1;3,1;6,1]
+                20, row (2,1) [1,3;1,2;1,1;3,1;6,1]
+            ]
+        fun lvl cr ->
+            rows |> Map.tryFind lvl |> Option.bind (fun m -> m cr)
+    fun (settings: ConstructionSettings) lvl N ->
+        let creatures =
+            match byCR |> Map.tryFind cr with
+            | Some creatures ->
+                creatures |> Array.filter (fun (m:Header) ->
+                    settings.sources |> List.exists((=) m.sourcebook)
+                    && (settings.creatureType.IsEmpty
+                        || settings.creatureType |> List.exists((=)m.creatureType)))
+            | None -> Array.empty
+        let rec generate() =
+            let mutable budget = float settings.partySize
+            let cr = chooseFrom (crs |> Array.filter (fun cr ->
+                match table lvl cr with
+                | Some(n,m) -> (float n)/(float m) <- budget
+                | _ -> false)
+            let cost
+        List.init N (fun _ -> generate(())
+        // 1 of each creature at each CR, ignoring N
+        List.ofArray (creatures |> Array.map (fun m -> [1, m]))
+
+let buildEncounter: ConstructEncounter =
+    fun settings lvl N ->
+        match settings.method with
+        | PureCR -> constructPureCR settings lvl N
+        | Xanathar(typ, diff) ->
+            // for now we will ignore the type
+            failwith "No impl"
+        | DMG diff | ShiningSword diff ->
+            failwith "No impl"

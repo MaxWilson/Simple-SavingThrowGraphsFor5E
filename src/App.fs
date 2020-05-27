@@ -47,7 +47,7 @@ let update msg model =
         { model with analysis = InProgress }, Cmd.OfAsync.result (async {
             do! Async.Sleep 100
             try
-                let evalResps = Compute.eval Compute.constructPureCR model.constructSettings model.evalSettings
+                let evalResps = Compute.eval Compute.buildEncounter model.constructSettings model.evalSettings
                 return Evaluate(Finished (Ok { settings = model.constructSettings, model.evalSettings; results = evalResps }))
             with e ->
                 return Evaluate(Finished (Error ("Something went wrong" + e.ToString())))
