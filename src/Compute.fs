@@ -190,6 +190,20 @@ let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: 
     let effectiveness = numberAffected / (float numberOfMonsters) * 100.
     effectiveness
 
+let dcOf =
+    function
+    // assume maxed stats + prof
+    | Dynamic ->
+        function
+        | n when n <= 3. -> 13
+        | n when n <= 4. -> 14
+        | n when n <= 7. -> 15
+        | n when n <= 8. -> 16
+        | n when n <= 12. -> 17
+        | n when n <= 16. -> 18
+        | n -> 19
+    | Fixed n -> fun _ -> n
+
 let eval: Evaluate = fun construct constructSettings evalSettings ->
     let range = match constructSettings.method with PureCR -> [0.; 0.125; 0.25; 0.5] @ [1. .. 30.] | _ -> [1. .. 20.]
     let N = 1000
@@ -214,19 +228,6 @@ let eval: Evaluate = fun construct constructSettings evalSettings ->
         attack = attack
         ability = ability
         results = [for level in range do
-                    let dcOf =
-                        function
-                        // assume maxed stats + prof
-                        | Dynamic ->
-                            function
-                            | n when n <= 3. -> 13
-                            | n when n <= 4. -> 14
-                            | n when n <= 7. -> 15
-                            | n when n <= 8. -> 16
-                            | n when n <= 12. -> 17
-                            | n when n <= 16. -> 18
-                            | n -> 19
-                        | Fixed n -> fun _ -> n
                     let dc = dcOf evalSettings.dcComputer level
 
                     let encounters = encountersByLevel.[level]
