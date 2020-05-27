@@ -21,7 +21,7 @@ var CONFIG = {
     cssEntry: './src/main.sass',
     outputDir: './dist',
     assetsDir: './public',
-    publicPath: '/', // Where the bundled files are accessible relative to server root
+    publicPath: '', // Where the bundled files are accessible relative to server root
     devServerPort: 8080,
     // When using webpack-dev-server, you may need to redirect some calls
     // to a external API server. See https://webpack.js.org/configuration/dev-server/#devserver-proxy
@@ -94,7 +94,7 @@ module.exports = {
     plugins: isProduction ?
         commonPlugins.concat([
             new MiniCssExtractPlugin({ filename: 'style.[contenthash].css' }),
-            new CopyWebpackPlugin([{ from: resolve(CONFIG.assetsDir) }]),
+            new CopyWebpackPlugin({ patterns: [{ from: resolve(CONFIG.assetsDir) }] }),
         ])
         : commonPlugins.concat([
             new webpack.HotModuleReplacementPlugin(),

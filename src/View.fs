@@ -123,7 +123,6 @@ module Settings =
                     ]
                 ]
 
-
             if analysisChoice = Some Encounter then
                 Bulma.dropdownDivider []
                 let methodChoice = model.choices |> List.tryPick((function EncounterMethod(v) -> Some (v) | _ -> None))
@@ -255,18 +254,21 @@ module Settings =
                         label
                     ]
 
-            let settings = (computeSettings model.choices)
-            Bulma.button.button [
-                prop.disabled settings.IsNone
-                prop.onClick (fun ev ->
-                                match settings with
-                                | Some settings ->
-                                    (UpdateSettings settings) |> dispatch
-                                    Evaluate Started |> dispatch
-                                | _ -> ()
-                                )
-                prop.text "Start"
-                ]
+            if analysisChoice = Some Encounter then
+                Html.h1 [prop.text "Sorry, encounter building isn't done yet. Please use Monsters (by CR) instead for now."; prop.style [style.color.red]]
+            else
+                let settings = (computeSettings model.choices)
+                Bulma.button.button [
+                    prop.disabled settings.IsNone
+                    prop.onClick (fun ev ->
+                                    match settings with
+                                    | Some settings ->
+                                        (UpdateSettings settings) |> dispatch
+                                        Evaluate Started |> dispatch
+                                    | _ -> ()
+                                    )
+                    prop.text "Start"
+                    ]
             ]
 
 module Graph =

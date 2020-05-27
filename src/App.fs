@@ -30,7 +30,7 @@ let update msg model =
         { fresh with creatures = model.creatures; choices = model.choices |> List.filter (function  Model.Wizard.TypeFilter _ | Model.Wizard.SourceFilter _ -> true | _ -> false) }, Cmd.Empty
     | LoadCreatures(Started) ->
         { model with creatures = InProgress }, Cmd.OfAsync.result (async {
-            let! (statusCode, responseText) = Http.get "/creatures.json"
+            let! (statusCode, responseText) = Http.get "creatures.json"
             if statusCode = 200 then
                 match Thoth.Json.Decode.fromString (Decode.array headerDecoder) (responseText) with
                 | Ok creatures ->
