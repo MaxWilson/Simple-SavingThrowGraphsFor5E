@@ -184,11 +184,16 @@ let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: 
             else
                 (success (save ab) dc)
         | Check -> success (stat ab) dc
-    let numberAffected = encounter |> List.sumBy(fun (n,m) ->
+    let numberAffected =
         match a with
-        | SingleTarget d -> effectivenessOfDefense m d
-        | AoE(d, maxTargets, maxPct) -> effectivenessOfDefense m d * (min (float n * maxPct/100.) (float maxTargets))
-        )
+        | SingleTarget d -> encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max
+        | AoE(d, maxTargets, maxPct) ->
+            let enemies = encounter |> List.collect(fun (n,m) -> let e = effectivenessOfDefense m d in List.init n (fun _ -> e))
+            printfn "%A" enemies
+            if enemies.Length <= 1 then enemies.Head
+            else
+                enemies |> List.sortDescending |> List.take(min (float enemies.Length * maxPct/100. |> int) maxTargets)
+                |> List.sum
     let effectiveness = numberAffected / (float numberOfMonsters) * 100.
     effectiveness
 
@@ -219,7 +224,7 @@ let eval: Evaluate = fun construct constructSettings evalSettings ->
                             | Save -> ability.ToString()
                             | Check -> sprintf "%A check" ability
                             | NonmagicalSave -> sprintf "%A (bypass MR)" ability),
-                        // for now, no AoEs are supported
+                        // for now, no AoEs are generated
                         SingleTarget(attackType),
                         ability)
 
@@ -260,4 +265,3 @@ let constructPureCR : ConstructEncounter =
             | None -> Array.empty
         // 1 of each creature at each CR, ignoring N
         List.ofArray (creatures |> Array.map (fun m -> [1, m]))
-
