@@ -12,6 +12,20 @@ let header (txt: string) =
         prop.className "is-large"
         prop.text txt
         ]
+let radioOfBase dispatch (id:string) child (isChecked: bool) msg =
+    Checkradio.radio [ prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch msg)]
+    ,Html.label [ prop.htmlFor id; child ]
+let radioOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
+    radioOfBase dispatch id (prop.text txt) isChecked msg
+let checkboxOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
+    Switch.checkbox [ Checkradio.checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch msg)]
+    ,Html.label [ prop.htmlFor id; prop.text txt ]
+let group (bs: (ReactElement * ReactElement) list) =
+    Bulma.field.p [
+        for radio, label in bs do
+            radio
+            label
+        ]
 
 module Settings =
     open Compute
@@ -66,23 +80,12 @@ module Settings =
 
     let view (model: Model) dispatch =
         Bulma.section [
-            let radioOfBase (id:string) child (isChecked: bool) msg =
-                Checkradio.radio [ prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch (Choose msg))]
-                ,Html.label [ prop.htmlFor id; child ]
-            let radioOf (id:string) (txt:string) (isChecked: bool) msg =
-                radioOfBase id (prop.text txt) isChecked msg
-            let checkboxOf (id:string) (txt:string) (isChecked: bool) msg =
-                Switch.checkbox [ Checkradio.checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch (Choose msg))]
-                ,Html.label [ prop.htmlFor id; prop.text txt ]
-            let group (bs: (ReactElement * ReactElement) list) =
-                Bulma.field.p [
-                    for radio, label in bs do
-                        radio
-                        label
-                    ]
             let toggle choices choice =
                 if choices |> List.contains choice |> not then choice::choices
                 else choices |> List.filter ((<>) choice)
+            let radioOfBase (id:string) child (isChecked: bool) msg = radioOfBase dispatch (id:string) child (isChecked: bool) (Choose msg)
+            let radioOf (id:string) child (isChecked: bool) msg = radioOf dispatch (id:string) child (isChecked: bool) (Choose msg)
+            let checkboxOf (id:string) child (isChecked: bool) msg = checkboxOf dispatch (id:string) child (isChecked: bool) (Choose msg)
 
             let analysisChoice = model.choices |> List.tryPick((function AnalysisType(v) -> Some (v) | _ -> None))
             header "What do you want to analyze?"
@@ -170,7 +173,7 @@ module Settings =
                     |> prop.children
                 Bulma.field.div [
                     let bs = [
-                        radioOf "dynamic" "Dynamic (based on PC level)" (dcChoice = Some Dynamic) (ChooseDC Dynamic)
+                        radioOf "dynamic" "Dynamic (based on estimated PC level)" (dcChoice = Some Dynamic) (ChooseDC Dynamic)
                         radioOfBase "fixed" fixedLabel (dcChoice |> function Some(Fixed _) -> true | _ -> false) (ChooseDC (Fixed None))
                         ]
                     for radio, label in bs do
@@ -191,7 +194,6 @@ module Settings =
                 prop.text "Start"
                 ]
             ]
-
 
 module Graph =
     let view (model: Model) (graph: Graph) dispatch =
@@ -329,6 +331,13 @@ let view (model: Model) dispatch =
             | Resolved (Ok graph) ->
                 Bulma.section [
                     Graph.view model graph dispatch
+                    Bulma.dropdownDivider[]
+                    group [
+                        radioOf dispatch "overview" "Overview" (model.focus = None) (SetFocus None)
+                        for a in [Str; Dex; Con; Int; Wis; Cha] do
+                            let name = a.ToString()
+                            radioOf dispatch name name (model.focus = Some a) (SetFocus <| Some a)
+                        ]
                     Html.button [
                         prop.onClick (fun _ -> dispatch Reset)
                         prop.text "Reset"

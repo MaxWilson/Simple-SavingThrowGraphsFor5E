@@ -9,24 +9,22 @@ open Compute
 
 let init _ =
     {
-        choices = []
-        constructSettings = { ConstructionSettings.creatureType = []; ConstructionSettings.sources = sources |> List.ofArray; ConstructionSettings.method = PureCR; ConstructionSettings.partySize = 4 }
-        evalSettings = {
-            abilities = [Str; Dex; Con; Int; Wis; Cha]
-            attackType = [Save]
-            dcComputer = Dynamic
-            }
-        creatures = NotStarted
-        analysis = NotStarted
-        }, Cmd.Empty
+    choices = []
+    constructSettings = { ConstructionSettings.creatureType = []; ConstructionSettings.sources = sources |> List.ofArray; ConstructionSettings.method = PureCR; ConstructionSettings.partySize = 4 }
+    evalSettings = {
+        abilities = [Str; Dex; Con; Int; Wis; Cha]
+        attackType = [Save]
+        dcComputer = Dynamic
+        }
+    creatures = NotStarted
+    analysis = NotStarted
+    focus = None
+    }, Cmd.Empty
+
 let update msg model =
     match msg with
     | Reset ->
         { model with analysis = NotStarted; choices = [] }, Cmd.Empty
-    | Choose choice ->
-        { model with choices = choice::model.choices }, Cmd.Empty
-    | UpdateSettings(c, e) ->
-        { model with constructSettings = c; evalSettings = e }, Cmd.Empty
     | LoadCreatures(Started) ->
         { model with creatures = InProgress }, Cmd.OfAsync.result (async {
             let! (statusCode, responseText) = Http.get "/creatures.json"
@@ -53,3 +51,8 @@ let update msg model =
             })
     | Evaluate(Finished v) ->
         { model with analysis = Resolved(v) }, Cmd.Empty
+    | Choose choice ->
+        { model with choices = choice::model.choices }, Cmd.Empty
+    | UpdateSettings(c, e) ->
+        { model with constructSettings = c; evalSettings = e }, Cmd.Empty
+    | SetFocus ab -> { model with focus = ab }, Cmd.Empty

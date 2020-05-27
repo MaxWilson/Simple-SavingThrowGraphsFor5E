@@ -26,6 +26,7 @@ type Model = {
     evalSettings: EvaluationSettings
     creatures: Deferred<Result<Header array, string>>
     analysis: Deferred<Result<Graph, string>>
+    focus: Ability option
     }
 
 type Msg =
@@ -34,3 +35,4 @@ type Msg =
     | UpdateSettings of ConstructionSettings * EvaluationSettings
     | Choose of Wizard.Choice
     | Reset
+    | SetFocus of Ability option
