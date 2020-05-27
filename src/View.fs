@@ -6,6 +6,8 @@ open Feliz.Plotly
 open Feliz.Bulma
 open Feliz.Bulma.Checkradio
 open Feliz.Bulma.Switch
+open Feliz.Bulma.PageLoader
+open Feliz.Bulma.QuickView
 
 let header (txt: string) =
     Html.span [
@@ -37,6 +39,10 @@ let vgroup (bs: (ReactElement * ReactElement) list) =
                 label
                 ]
         ]
+
+let toggle choices choice =
+    if choices |> List.contains choice |> not then choice::choices
+    else choices |> List.filter ((<>) choice)
 
 module Settings =
     open Compute
@@ -91,10 +97,6 @@ module Settings =
             Some (constrSettings, evalSettings)
         | _ -> None
 
-    let toggle choices choice =
-        if choices |> List.contains choice |> not then choice::choices
-        else choices |> List.filter ((<>) choice)
-
     let view (model: Model) dispatch =
         Bulma.section [
             let radioOfBase (id:string) child (isChecked: bool) msg = radioOfBase dispatch (id:string) child (isChecked: bool) (Choose msg)
@@ -103,10 +105,20 @@ module Settings =
 
             let analysisChoice = model.choices |> List.tryPick((function AnalysisType(v) -> Some (v) | _ -> None))
             header "What do you want to analyze?"
-            group [
-                radioOf "monsters" "Monsters (by CR)" (analysisChoice = Some PureCR) (AnalysisType PureCR)
-                radioOf "encounters" "Encounters (by PC level)" (analysisChoice = Some Encounter) (AnalysisType Encounter)
+            Bulma.field.p [
+                let rads = [
+                    radioOf "monsters" "Monsters (by CR)" (analysisChoice = Some PureCR) (AnalysisType PureCR)
+                    radioOf "encounters" "Encounters (by PC level)" (analysisChoice = Some Encounter) (AnalysisType Encounter)
+                    ]
+                for radio, label in rads do
+                    radio
+                    label
+                Bulma.button.button [
+                    prop.text "Set filters"
+                    prop.onClick (fun _ -> dispatch ToggleQuickView)
+                    ]
                 ]
+
 
             if analysisChoice = Some Encounter then
                 Bulma.dropdownDivider []
@@ -194,22 +206,6 @@ module Settings =
                     for radio, label in bs do
                         radio
                         label
-                    ]
-
-            if analysisChoice.IsSome then
-                Bulma.dropdownDivider []
-                header "Sources"
-                let sourceChoice = model.choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
-                vgroup [
-                    for source in Compute.sources do
-                        smallCheckboxOf dispatch ("chk" + source) source (sourceChoice.IsEmpty || sourceChoice |> List.contains source) (SourceFilter (toggle sourceChoice source) |> Choose)
-                    ]
-                Bulma.dropdownDivider []
-                header "Types"
-                let creatureTypeChoices = model.choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
-                vgroup [
-                    for creature in Compute.creatureTypes do
-                        smallCheckboxOf dispatch ("chk" + creature) creature (sourceChoice.IsEmpty || creatureTypeChoices |> List.contains creature) (TypeFilter (toggle creatureTypeChoices creature) |> Choose)
                     ]
 
             let settings = (computeSettings model.choices)
@@ -379,46 +375,91 @@ module Graph =
         myplot model traces
 
 let view (model: Model) dispatch =
-    Bulma.section [
-        Bulma.container [
-            Bulma.title.h2 "Shining Sword Saving Throw Analyzer"]
-        match model.creatures with
-        | NotStarted | InProgress -> header "Initializing..."
-        | Resolved (Error msg) ->
-            Html.h2 [
-                prop.style [style.color.red]
-                prop.text msg
+    Html.div [
+        prop.title "Shining Sword Saving Throw Analyzer"
+        prop.children [
+            PageLoader.pageLoader [
+                pageLoader.isSuccess
+                match model.creatures with
+                | NotStarted | InProgress ->
+                    pageLoader.isActive
+                | _ -> ()
+                prop.children [
+                    PageLoader.title "Loading the monsters"
+                    ]
                 ]
-        | Resolved (Ok creatures) ->
-            match model.analysis with
-            | NotStarted ->
-                Bulma.section [
-                    Settings.view model dispatch
-                    ]
-            | InProgress ->
-                Html.text "Please wait, analyzing..."
-            | Resolved (Error msg) ->
-                Html.h2 [
-                    prop.style [style.color.red]
-                    prop.text msg
-                    ]
-            | Resolved (Ok graph) ->
-                Bulma.section [
-                    match model.focus with
-                    | Some ability ->
-                        Graph.focused model ability graph dispatch
-                    | None ->
-                        Graph.overview model graph dispatch
-                    Bulma.dropdownDivider[]
-                    group [
-                        radioOf dispatch "overview" "Overview" (model.focus = None) (SetFocus None)
-                        for a in [Str; Dex; Con; Int; Wis; Cha] do
-                            let name = a.ToString()
-                            radioOf dispatch name name (model.focus = Some a) (SetFocus <| Some a)
+
+            Bulma.section [
+                Bulma.title.h2 "Shining Sword Saving Throw Analyzer"
+                match model.creatures with
+                | NotStarted | InProgress -> ()
+                | Resolved (Error msg) ->
+                    Html.h2 [
+                        prop.style [style.color.red]
+                        prop.text msg
                         ]
-                    Html.button [
-                        prop.onClick (fun _ -> dispatch Reset)
-                        prop.text "Reset"
+                | Resolved (Ok creatures) ->
+                    match model.analysis with
+                    | NotStarted ->
+                        Bulma.section [
+                            Settings.view model dispatch
+                            QuickView.quickview [
+                                if model.showQuickview then quickview.isActive
+                                prop.children [
+                                    QuickView.header [
+                                        Html.div "Filters"
+                                        Bulma.delete [ prop.onClick (fun _ -> ToggleQuickView |> dispatch) ]
+                                    ]
+                                    QuickView.body [
+                                        header "Sources"
+                                        let sourceChoice = model.choices |> List.tryPick((function Model.Wizard.SourceFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
+                                        vgroup [
+                                            for source in Compute.sources do
+                                                smallCheckboxOf dispatch ("chk" + source) source (sourceChoice.IsEmpty || sourceChoice |> List.contains source) (Model.Wizard.SourceFilter (toggle sourceChoice source) |> Choose)
+                                            ]
+                                        Bulma.dropdownDivider []
+                                        header "Types"
+                                        let creatureTypeChoices = model.choices |> List.tryPick((function Model.Wizard.TypeFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
+                                        vgroup [
+                                            for creature in Compute.creatureTypes do
+                                                smallCheckboxOf dispatch ("chk" + creature) creature (sourceChoice.IsEmpty || creatureTypeChoices |> List.contains creature) (Model.Wizard.TypeFilter (toggle creatureTypeChoices creature) |> Choose)
+                                            ]
+                                        ]
+                                    QuickView.footer [
+                                        Bulma.button.button [
+                                            prop.text "OK"
+                                            prop.onClick (fun _ -> dispatch ToggleQuickView)
+                                            ]
+                                        ]
+                                ]
+                            ]
                         ]
-                    ]
+                    | InProgress ->
+                        Html.text "Please wait, analyzing..."
+                    | Resolved (Error msg) ->
+                        Html.h2 [
+                            prop.style [style.color.red]
+                            prop.text msg
+                            ]
+                    | Resolved (Ok graph) ->
+                        Bulma.section [
+                            match model.focus with
+                            | Some ability ->
+                                Graph.focused model ability graph dispatch
+                            | None ->
+                                Graph.overview model graph dispatch
+                            Bulma.dropdownDivider[]
+                            group [
+                                radioOf dispatch "overview" "Overview" (model.focus = None) (SetFocus None)
+                                for a in [Str; Dex; Con; Int; Wis; Cha] do
+                                    let name = a.ToString()
+                                    radioOf dispatch name name (model.focus = Some a) (SetFocus <| Some a)
+                                ]
+                            Bulma.button.button [
+                                prop.onClick (fun _ -> dispatch Reset)
+                                prop.text "Reset"
+                                ]
+                            ]
+                ]
+            ]
         ]

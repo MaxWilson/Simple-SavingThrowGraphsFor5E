@@ -29,6 +29,7 @@ type Model = {
     creatures: Deferred<Result<Header array, string>>
     analysis: Deferred<Result<Graph, string>>
     focus: Ability option
+    showQuickview: bool
     }
 
 type Msg =
@@ -38,3 +39,4 @@ type Msg =
     | Choose of Wizard.Choice
     | Reset
     | SetFocus of Ability option
+    | ToggleQuickView

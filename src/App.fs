@@ -7,24 +7,27 @@ open Fable.SimpleHttp
 open Thoth.Json
 open Compute
 
-let init _ =
+let fresh =
     {
     choices = []
     constructSettings = { ConstructionSettings.creatureType = []; ConstructionSettings.sources = sources |> List.ofArray; ConstructionSettings.method = PureCR; ConstructionSettings.partySize = 4 }
     evalSettings = {
-        abilities = [Str; Dex; Con; Int; Wis; Cha]
-        attackType = [Save]
+        abilities = []
+        attackType = []
         dcComputer = Dynamic
         }
     creatures = NotStarted
     analysis = NotStarted
     focus = None
-    }, Cmd.Empty
+    showQuickview = false
+    }
+let init _ =
+    fresh, Cmd.Empty
 
 let update msg model =
     match msg with
     | Reset ->
-        { model with analysis = NotStarted; choices = [] }, Cmd.Empty
+        { fresh with creatures = model.creatures }, Cmd.Empty
     | LoadCreatures(Started) ->
         { model with creatures = InProgress }, Cmd.OfAsync.result (async {
             let! (statusCode, responseText) = Http.get "/creatures.json"
@@ -56,3 +59,4 @@ let update msg model =
     | UpdateSettings(c, e) ->
         { model with constructSettings = c; evalSettings = e }, Cmd.Empty
     | SetFocus ab -> { model with focus = ab }, Cmd.Empty
+    | ToggleQuickView -> { model with showQuickview = not model.showQuickview }, Cmd.Empty
