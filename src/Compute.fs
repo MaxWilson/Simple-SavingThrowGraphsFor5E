@@ -153,7 +153,7 @@ let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: 
             match save with
                     | Some v -> v
                     | None -> (stat) / 2 - 5
-        let stat (stat, _) = stat
+        let stat (stat, _) = stat / 2 - 5
         let ab = match ability with
                     | Str -> m.stats.str
                     | Dex -> m.stats.dex
