@@ -20,6 +20,8 @@ module Wizard =
         | BypassMR of bool
         | ChooseDC of DC
         | PartySize of int
+        | SourceFilter of string list
+        | TypeFilter of string list
 type Model = {
     choices: Wizard.Choice list
     constructSettings: ConstructionSettings

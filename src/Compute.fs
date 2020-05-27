@@ -54,6 +54,7 @@ let sources = [|"Out of the Abyss"; "Princes of the Apocalypse";
     "Storm King's Thunder"; "Curse of Strahd"; "Tales from the Yawning Portal";
     "Tomb of Annihilation"; "The Tortle Package"; "Volo's Guide to Monsters";
     "Eberron - Rising from the Last War"|]
+let mutable creatureTypes = [||]
 let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 1. .. 30.]
 let mutable byCR = creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
 let mutable bySrcCR = creatures |> Array.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
@@ -63,6 +64,7 @@ let initialize input =
     byName <- creatures |> Seq.map (fun m -> m.name, m) |> Map.ofSeq
     byCR <- creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
     bySrcCR <- creatures |> Array.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
+    creatureTypes <- creatures |> Seq.map (fun m -> m.creatureType) |> Seq.distinct |> Seq.filter (not << System.String.IsNullOrWhiteSpace) |> Array.ofSeq
 
 let statsDecoder : Decoder<Stats> =
     let stat = (Decode.tuple2 Decode.int (Decode.option Decode.int))

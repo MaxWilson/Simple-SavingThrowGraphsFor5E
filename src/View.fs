@@ -20,11 +20,22 @@ let radioOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
 let checkboxOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
     Switch.checkbox [ Checkradio.checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
     ,Html.label [ prop.htmlFor id; prop.text txt ]
+let smallCheckboxOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
+    Switch.checkbox [ Checkradio.checkradio.isSmall; prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
+    ,Html.label [ prop.htmlFor id; prop.text txt ]
 let group (bs: (ReactElement * ReactElement) list) =
     Bulma.field.p [
         for radio, label in bs do
             radio
             label
+        ]
+let vgroup (bs: (ReactElement * ReactElement) list) =
+    Html.ul [
+        for radio, label in bs do
+            Html.li [
+                radio
+                label
+                ]
         ]
 
 module Settings =
@@ -49,12 +60,14 @@ module Settings =
             | _ -> None
         let (|DC|_|) = function DcChoice(Fixed(Some n)) -> Compute.Fixed n |> Some | DcChoice Dynamic -> Some Compute.Dynamic | _ -> None
         let (|AttackTypes|_|) = function DefenseChoices(def) -> Some(def) | _ -> None
+        let sources = choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> (function None | Some [] -> (Compute.sources |> List.ofArray) | Some src -> src)
+        let creatureTypes = choices |> List.tryPick((function TypeFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
         match choices with
         | Method (Compute.PureCR as method) & DC dc & AttackTypes(attackTypes) ->
             let constrSettings = {
                 ConstructionSettings.partySize = 1
-                sources = Compute.sources |> List.ofArray
-                creatureType = []
+                sources = sources
+                creatureType = creatureTypes
                 method = method
                 }
             let evalSettings = {
@@ -66,8 +79,8 @@ module Settings =
         | PartySize partySize & Method method & DC dc & AttackTypes(attackTypes) ->
             let constrSettings = {
                 ConstructionSettings.partySize = partySize
-                sources = Compute.sources |> List.ofArray
-                creatureType = []
+                sources = sources
+                creatureType = creatureTypes
                 method = method
                 }
             let evalSettings = {
@@ -78,14 +91,15 @@ module Settings =
             Some (constrSettings, evalSettings)
         | _ -> None
 
+    let toggle choices choice =
+        if choices |> List.contains choice |> not then choice::choices
+        else choices |> List.filter ((<>) choice)
+
     let view (model: Model) dispatch =
         Bulma.section [
-            let toggle choices choice =
-                if choices |> List.contains choice |> not then choice::choices
-                else choices |> List.filter ((<>) choice)
             let radioOfBase (id:string) child (isChecked: bool) msg = radioOfBase dispatch (id:string) child (isChecked: bool) (Choose msg)
-            let radioOf (id:string) child (isChecked: bool) msg = radioOf dispatch (id:string) child (isChecked: bool) (Choose msg)
-            let checkboxOf (id:string) child (isChecked: bool) msg = checkboxOf dispatch (id:string) child (isChecked: bool) (Choose msg)
+            let radioOf (id:string) txt (isChecked: bool) msg = radioOf dispatch (id:string) txt (isChecked: bool) (Choose msg)
+            let checkboxOf (id:string) txt (isChecked: bool) msg = checkboxOf dispatch (id:string) txt (isChecked: bool) (Choose msg)
 
             let analysisChoice = model.choices |> List.tryPick((function AnalysisType(v) -> Some (v) | _ -> None))
             header "What do you want to analyze?"
@@ -103,6 +117,7 @@ module Settings =
                     radioOf "dmg" "DMG method" (methodChoice = Some DMG) (EncounterMethod DMG)
                     radioOf "shiningSword" "ShiningSword method (modified DMG)" (methodChoice = Some ShiningSword) (EncounterMethod ShiningSword)
                     ]
+
                 if methodChoice.IsSome then
                     let difficultyChoice = model.choices |> List.tryPick((function Difficulty(v) -> Some (v) | _ -> None))
                     Bulma.dropdownDivider []
@@ -179,6 +194,22 @@ module Settings =
                     for radio, label in bs do
                         radio
                         label
+                    ]
+
+            if analysisChoice.IsSome then
+                Bulma.dropdownDivider []
+                header "Sources"
+                let sourceChoice = model.choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
+                vgroup [
+                    for source in Compute.sources do
+                        smallCheckboxOf dispatch ("chk" + source) source (sourceChoice.IsEmpty || sourceChoice |> List.contains source) (SourceFilter (toggle sourceChoice source) |> Choose)
+                    ]
+                Bulma.dropdownDivider []
+                header "Types"
+                let creatureTypeChoices = model.choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
+                vgroup [
+                    for creature in Compute.creatureTypes do
+                        smallCheckboxOf dispatch ("chk" + creature) creature (sourceChoice.IsEmpty || creatureTypeChoices |> List.contains creature) (TypeFilter (toggle creatureTypeChoices creature) |> Choose)
                     ]
 
             let settings = (computeSettings model.choices)
