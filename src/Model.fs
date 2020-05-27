@@ -12,7 +12,7 @@ module Wizard =
     type AnalysisType = | PureCR | Encounter
     type EncounterMethod = | Xanathar | DMG | ShiningSword
     type DC = Fixed of int option | Dynamic
-    type Targeting = Single | AoE of float * float
+    type Targeting = Single | AoE of int * float
     type Choice =
         | AnalysisType of AnalysisType
         | TargetingChoice of Targeting

@@ -55,6 +55,7 @@ module Settings =
         let (|DefenseChoices|_|) choices = choices |> List.tryPick((function DefenseMethod(v) -> Some (v) | _ -> None))
         let (|DcChoice|_|) choices = choices |> List.tryPick((function ChooseDC(v) -> Some (v) | _ -> None))
         let (|PartySize|_|) choices = choices |> List.tryPick((function PartySize(v) -> Some (v) | _ -> None))
+        let (|TargetingChoice|_|) choices = choices |> List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
         let (|Method|_|) = function
             | AnalysisChoice PureCR -> Some Compute.PureCR
             | AnalysisChoice Encounter & MethodChoice(method) & DifficultyChoice(diff) ->
@@ -65,7 +66,10 @@ module Settings =
                 | _ -> None
             | _ -> None
         let (|DC|_|) = function DcChoice(Fixed(Some n)) -> Compute.Fixed n |> Some | DcChoice Dynamic -> Some Compute.Dynamic | _ -> None
-        let (|AttackTypes|_|) = function DefenseChoices(def) -> Some(def) | _ -> None
+        let (|AttackTypes|_|) = function
+            | DefenseChoices(def) & TargetingChoice(Single) -> Some(def |> List.map SingleTarget)
+            | DefenseChoices(def) & TargetingChoice(AoE(maxTargets, maxPct)) -> Some(def |> List.map (fun d -> Compute.AoE(d, maxTargets, maxPct)))
+            | _ -> None
         let sources = choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> (function None | Some [] -> (Compute.sources |> List.ofArray) | Some src -> src)
         let creatureTypes = choices |> List.tryPick((function TypeFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
         match choices with
@@ -182,7 +186,7 @@ module Settings =
                             prop.placeholder "max number"
                             prop.value (maxTargets.ToString())
                             prop.onChange(fun str ->
-                                match System.Double.TryParse str with
+                                match System.Int32.TryParse str with
                                 | true, n -> dispatch (Choose (TargetingChoice (AoE(n, maxPct))))
                                 | _ -> ()
                                 )
@@ -193,7 +197,7 @@ module Settings =
             Bulma.field.div [
                 let bs = [
                     radioOf "singleTarget" "Single Target" (match targetingChoice with Some(Single(_)) -> true | _ -> false) (TargetingChoice Single)
-                    radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8., 50.)))
+                    radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8, 50.)))
                     ]
                 for radio, label in bs do
                     radio

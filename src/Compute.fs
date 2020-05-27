@@ -141,7 +141,7 @@ type EvaluationResponse = {
 type DCComputer = Fixed of int | Dynamic
 type EvaluationSettings = {
     abilities: Ability list
-    attackType: DefenseMethod list
+    attackType: Attack list
     dcComputer: DCComputer
     }
 type Evaluate = ConstructEncounter -> ConstructionSettings -> EvaluationSettings -> EvaluationResponse list
@@ -220,12 +220,12 @@ let eval: Evaluate = fun construct constructSettings evalSettings ->
             for ability in settings.abilities do
                 for attackType in settings.attackType do
                     Evaluation(
-                        (match attackType with
+                        (match (attackType |> function SingleTarget(d) | AoE(d,_,_) -> d) with
                             | Save -> ability.ToString()
                             | Check -> sprintf "%A check" ability
                             | NonmagicalSave -> sprintf "%A (bypass MR)" ability),
                         // for now, no AoEs are generated
-                        SingleTarget(attackType),
+                        attackType,
                         ability)
 
         ]
