@@ -67,7 +67,7 @@ module Settings =
             | _ -> None
         let (|DC|_|) = function DcChoice(Fixed(Some n)) -> Compute.Fixed n |> Some | DcChoice Dynamic -> Some Compute.Dynamic | _ -> None
         let (|AttackTypes|_|) = function
-            | DefenseChoices(def) & TargetingChoice(Single) -> Some(def |> List.map SingleTarget)
+            | DefenseChoices(def) & (TargetingChoice(Single) | AnalysisChoice PureCR) -> Some(def |> List.map SingleTarget)
             | DefenseChoices(def) & TargetingChoice(AoE(maxTargets, maxPct)) -> Some(def |> List.map (fun d -> Compute.AoE(d, maxTargets, maxPct)))
             | _ -> None
         let sources = choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> (function None | Some [] -> (Compute.sources |> List.ofArray) | Some src -> src)
@@ -159,49 +159,49 @@ module Settings =
                             | _ -> ()
                             )
                         ]
-            Bulma.dropdownDivider []
-            header "Can your attack hit more than one target?"
-            let targetingChoice = model.choices |> List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
-            let aoeLabel =
-                match targetingChoice with
-                | Some(AoE(maxTargets, maxPct)) ->
-                    Html.span [
-                        header "Area Effect that hits up to"
-                        Bulma.input.number [
-                            prop.maxLength 4
-                            prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
-                            prop.placeholder "50%"
-                            prop.value (maxPct.ToString())
-                            prop.onChange(fun str ->
-                                match System.Double.TryParse str with
-                                | true, n -> dispatch (Choose (TargetingChoice (AoE(maxTargets, n))))
-                                | _ -> ()
-                                )
+                Bulma.dropdownDivider []
+                header "Can your attack hit more than one target?"
+                let targetingChoice = model.choices |> List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
+                let aoeLabel =
+                    match targetingChoice with
+                    | Some(AoE(maxTargets, maxPct)) ->
+                        Html.span [
+                            header "Area Effect that hits up to"
+                            Bulma.input.number [
+                                prop.maxLength 4
+                                prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
+                                prop.placeholder "50%"
+                                prop.value (maxPct.ToString())
+                                prop.onChange(fun str ->
+                                    match System.Double.TryParse str with
+                                    | true, n -> dispatch (Choose (TargetingChoice (AoE(maxTargets, n))))
+                                    | _ -> ()
+                                    )
+                                ]
+                            header "% of enemies, up to a maximum of"
+                            Bulma.input.number [
+                                prop.maxLength 4
+                                prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
+                                prop.placeholder "max number"
+                                prop.value (maxTargets.ToString())
+                                prop.onChange(fun str ->
+                                    match System.Int32.TryParse str with
+                                    | true, n -> dispatch (Choose (TargetingChoice (AoE(n, maxPct))))
+                                    | _ -> ()
+                                    )
+                                ]
                             ]
-                        header "% of enemies, up to a maximum of"
-                        Bulma.input.number [
-                            prop.maxLength 4
-                            prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
-                            prop.placeholder "max number"
-                            prop.value (maxTargets.ToString())
-                            prop.onChange(fun str ->
-                                match System.Int32.TryParse str with
-                                | true, n -> dispatch (Choose (TargetingChoice (AoE(n, maxPct))))
-                                | _ -> ()
-                                )
-                            ]
+                    | _ -> Html.text "Area Effect"
+                    |> prop.children
+                Bulma.field.div [
+                    let bs = [
+                        radioOf "singleTarget" "Single Target" (match targetingChoice with Some(Single(_)) -> true | _ -> false) (TargetingChoice Single)
+                        radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8, 50.)))
                         ]
-                | _ -> Html.text "Area Effect"
-                |> prop.children
-            Bulma.field.div [
-                let bs = [
-                    radioOf "singleTarget" "Single Target" (match targetingChoice with Some(Single(_)) -> true | _ -> false) (TargetingChoice Single)
-                    radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8, 50.)))
+                    for radio, label in bs do
+                        radio
+                        label
                     ]
-                for radio, label in bs do
-                    radio
-                    label
-                ]
 
             Bulma.dropdownDivider []
             header "Are you targeting saving throws, ability checks, or both?"
