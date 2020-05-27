@@ -9,17 +9,22 @@ open Compute
 
 let init _ =
     {
-    constructSettings = { ConstructionSettings.creatureType = []; ConstructionSettings.sources = sources |> List.ofArray; ConstructionSettings.method = PureCR; ConstructionSettings.partySize = 4 }
-    evalSettings = {
-        abilities = [Str; Dex; Con; Int; Wis; Cha]
-        attackType = [Save]
-        dcComputer = DynamicDC
-        }
-    creatures = NotStarted
-    analysis = NotStarted
-    }, Cmd.Empty
+        choices = []
+        constructSettings = { ConstructionSettings.creatureType = []; ConstructionSettings.sources = sources |> List.ofArray; ConstructionSettings.method = PureCR; ConstructionSettings.partySize = 4 }
+        evalSettings = {
+            abilities = [Str; Dex; Con; Int; Wis; Cha]
+            attackType = [Save]
+            dcComputer = Dynamic
+            }
+        creatures = NotStarted
+        analysis = NotStarted
+        }, Cmd.Empty
 let update msg model =
     match msg with
+    | Reset ->
+        { model with analysis = NotStarted; choices = [] }, Cmd.Empty
+    | Choose choice ->
+        { model with choices = choice::model.choices }, Cmd.Empty
     | LoadCreatures(Started) ->
         { model with creatures = InProgress }, Cmd.OfAsync.result (async {
             let! (statusCode, responseText) = Http.get "/creatures.json"

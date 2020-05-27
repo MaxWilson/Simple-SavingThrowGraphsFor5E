@@ -4,10 +4,120 @@ open Model
 open Feliz
 open Feliz.Plotly
 open Feliz.Bulma
+open Feliz.Bulma.Checkradio
+open Feliz.Bulma.Switch
+
+let header (txt: string) =
+    Html.text [
+        prop.className "is-large"
+        prop.text txt
+        ]
 
 module Settings =
+    open Compute
+    open Model.Wizard
     let view (model: Model) dispatch =
-        ()
+        Bulma.section [
+            let radioOfBase (id:string) child (isChecked: bool) msg =
+                Checkradio.radio [ prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch (Choose msg))]
+                ,Html.label [ prop.htmlFor id; child ]
+            let radioOf (id:string) (txt:string) (isChecked: bool) msg =
+                radioOfBase id (prop.text txt) isChecked msg
+            let checkboxOf (id:string) (txt:string) (isChecked: bool) msg =
+                Switch.checkbox [ Checkradio.checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch (Choose msg))]
+                ,Html.label [ prop.htmlFor id; prop.text txt ]
+            let group (bs: (ReactElement * ReactElement) list) =
+                Bulma.field.p [
+                    for radio, label in bs do
+                        radio
+                        label
+                    ]
+            let toggle choices choice =
+                if choices |> List.contains choice |> not then choice::choices
+                else choices |> List.filter ((<>) choice)
+
+            let analysisChoice = model.choices |> List.tryPick((function AnalysisType(v) -> Some (v) | _ -> None))
+            header "What do you want to analyze?"
+            group [
+                radioOf "monsters" "Monsters (by CR)" (analysisChoice = Some PureCR) (AnalysisType PureCR)
+                radioOf "encounters" "Encounters (by PC level)" (analysisChoice = Some Encounter) (AnalysisType Encounter)
+                ]
+
+            if analysisChoice = Some Encounter then
+                let methodChoice = model.choices |> List.tryPick((function EncounterMethod(v) -> Some (v) | _ -> None))
+                header "How do you want to balance the encounters?"
+                group [
+                    radioOf "xanathar" "Xanathar's method" (methodChoice = Some Xanathar) (EncounterMethod Xanathar)
+                    radioOf "dmg" "DMG method" (methodChoice = Some DMG) (EncounterMethod DMG)
+                    radioOf "shiningSword" "ShiningSword method (modified DMG)" (methodChoice = Some ShiningSword) (EncounterMethod ShiningSword)
+                    ]
+                if methodChoice.IsSome then
+                    let difficultyChoice = model.choices |> List.tryPick((function Difficulty(v) -> Some (v) | _ -> None))
+                    header "What difficulty?"
+                    group [
+                        radioOf "easy" "Easy" (difficultyChoice = Some Easy) (Difficulty Easy)
+                        radioOf "medium" "Medium" (difficultyChoice = Some Medium) (Difficulty Medium)
+                        radioOf "hard" "Hard" (difficultyChoice = Some Hard) (Difficulty Hard)
+                        if methodChoice.Value <> Xanathar then
+                            radioOf "deadly" "Deadly" (difficultyChoice = Some Deadly) (Difficulty Deadly)
+                        ]
+
+            header "Are you targeting saving throws, ability checks, or both?"
+            let defenseChoice = model.choices |> List.tryPick((function DefenseMethod(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
+            group [
+                checkboxOf "save" "Saving throws" (defenseChoice |> List.contains Save) (DefenseMethod (toggle defenseChoice Save))
+                checkboxOf "check" "Ability checks" (defenseChoice |> List.contains Check) (DefenseMethod (toggle defenseChoice Check))
+                ]
+
+            if defenseChoice |> List.contains Save then
+                header "Do your attacks bypass magic resistance (e.g. Battlemaster maneuvers)?"
+                let mrChoice = model.choices |> List.tryPick((function BypassMR(v) -> Some (v) | _ -> None))
+                group [
+                    radioOf "normalMr" "No, they are magical" (mrChoice = Some false) (BypassMR false)
+                    radioOf "bypassMR" "Yes, they are nonmagical" (mrChoice = Some true) (BypassMR true)
+                    ]
+
+            if defenseChoice.Length > 0 then
+                header "Dynamic DC or fixed?"
+                let dcChoice = model.choices |> List.tryPick((function ChooseDC(v) -> Some (v) | _ -> None))
+
+                let fixedLabel =
+                    match dcChoice with
+                    | Some(Fixed dc) ->
+                        Html.span [
+                            header "Fixed DC"
+                            Bulma.input.number [
+                                prop.maxLength 2
+                                prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft (length.em 2)]
+                                prop.value (dc.ToString())
+                                prop.onChange(fun str ->
+                                    match System.Int32.TryParse str with
+                                    | true, n -> dispatch (Choose (ChooseDC (Fixed n)))
+                                    | _ -> ()
+                                    )
+                                ]
+                            ]
+                    | _ -> Html.text "Fixed DC"
+                    |> prop.children
+                Bulma.field.div [
+                    let bs = [
+                        radioOf "dynamic" "Dynamic (based on PC level)" (dcChoice = Some Dynamic) (ChooseDC Dynamic)
+                        radioOfBase "fixed" fixedLabel (dcChoice |> function Some(Fixed _) -> true | _ -> false) (ChooseDC (Fixed 13))
+                        ]
+                    for radio, label in bs do
+                        radio
+                        label
+                    ]
+
+
+            Bulma.button.button [
+                prop.onClick (fun ev ->
+                                Evaluate Started |> dispatch
+                                )
+                prop.text "Start"
+                ]
+            ]
+
 
 module Graph =
     let view (model: Model) (graph: Graph) dispatch =
@@ -97,7 +207,7 @@ module Graph =
                 layout.plotBgcolor (color.rgb(229, 229, 229))
                 layout.xaxis [
                     xaxis.gridcolor (color.rgb(255, 255, 255))
-                    xaxis.range [ 0.; match model.constructSettings.method with PureCR -> 30. | _ -> 20. ]
+                    xaxis.range [ 0.; match model.constructSettings.method with Compute.PureCR -> 30. | _ -> 20. ]
                     xaxis.showgrid true
                     xaxis.showline false
                     xaxis.showticklabels true
@@ -121,9 +231,9 @@ module Graph =
 let view (model: Model) dispatch =
     Bulma.section [
         Bulma.container [
-            Bulma.title.h2 "Which monster saving throws are best to target?"]
+            Bulma.title.h2 "Shining Sword Saving Throw Analyzer"]
         match model.creatures with
-        | NotStarted | InProgress -> Html.h2 "Initializing..."
+        | NotStarted | InProgress -> header "Initializing..."
         | Resolved (Error msg) ->
             Html.h2 [
                 prop.style [style.color.red]
@@ -133,15 +243,7 @@ let view (model: Model) dispatch =
             match model.analysis with
             | NotStarted ->
                 Bulma.section [
-                    Bulma.container [
-                        Html.text (sprintf "Loaded %d creatures." creatures.Length)
-                        ]
-                    Bulma.button.button [
-                        prop.onClick (fun ev ->
-                                        Evaluate Started |> dispatch
-                                        )
-                        prop.text "Start"
-                        ]
+                    Settings.view model dispatch
                     ]
             | InProgress ->
                 Html.text "Please wait, analyzing..."
@@ -151,5 +253,11 @@ let view (model: Model) dispatch =
                     prop.text msg
                     ]
             | Resolved (Ok graph) ->
-                Graph.view model graph dispatch
+                Bulma.section [
+                    Graph.view model graph dispatch
+                    Html.button [
+                        prop.onClick (fun _ -> dispatch Reset)
+                        prop.text "Reset"
+                        ]
+                    ]
         ]

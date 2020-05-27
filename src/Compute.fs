@@ -136,7 +136,7 @@ type EvaluationResponse = {
     ability: Ability
     results: LevelResult list
     }
-type DCComputer = Fixed of int | DynamicDC
+type DCComputer = Fixed of int | Dynamic
 type EvaluationSettings = {
     abilities: Ability list
     attackType: DefenseMethod list
@@ -217,7 +217,7 @@ let eval: Evaluate = fun construct constructSettings evalSettings ->
                     let dcOf =
                         function
                         // assume maxed stats + prof
-                        | DynamicDC ->
+                        | Dynamic ->
                             function
                             | n when n <= 3. -> 13
                             | n when n <= 4. -> 14

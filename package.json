@@ -8,6 +8,8 @@
     "@babel/preset-env": "^7.9.6",
     "babel-loader": "^8.1.0",
     "bulma": "^0.8.2",
+    "bulma-checkradio": "^1.1.1",
+    "bulma-switch": "^2.0.0",
     "copy-webpack-plugin": "^6.0.1",
     "core-js": "^3.6.5",
     "css-loader": "^3.5.3",
