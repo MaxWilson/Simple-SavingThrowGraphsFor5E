@@ -167,7 +167,7 @@ module Settings =
                 match targetingChoice with
                 | Some(AoE(maxTargets, maxPct)) ->
                     Html.span [
-                        header "AoE that hits up to"
+                        header "Area Effect that hits up to"
                         Bulma.input.number [
                             prop.maxLength 4
                             prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
@@ -179,7 +179,7 @@ module Settings =
                                 | _ -> ()
                                 )
                             ]
-                        header "% of enemies, p to a maximum of"
+                        header "% of enemies, up to a maximum of"
                         Bulma.input.number [
                             prop.maxLength 4
                             prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
@@ -192,7 +192,7 @@ module Settings =
                                 )
                             ]
                         ]
-                | _ -> Html.text "Fixed DC"
+                | _ -> Html.text "Area Effect"
                 |> prop.children
             Bulma.field.div [
                 let bs = [
