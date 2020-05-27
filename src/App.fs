@@ -27,7 +27,7 @@ let init _ =
 let update msg model =
     match msg with
     | Reset ->
-        { fresh with creatures = model.creatures }, Cmd.Empty
+        { fresh with creatures = model.creatures; choices = model.choices |> List.filter (function  Model.Wizard.TypeFilter _ | Model.Wizard.SourceFilter _ -> true | _ -> false) }, Cmd.Empty
     | LoadCreatures(Started) ->
         { model with creatures = InProgress }, Cmd.OfAsync.result (async {
             let! (statusCode, responseText) = Http.get "/creatures.json"
