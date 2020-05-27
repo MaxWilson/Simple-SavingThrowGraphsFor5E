@@ -11,13 +11,15 @@ type Graph = {
 module Wizard =
     type AnalysisType = | PureCR | Encounter
     type EncounterMethod = | Xanathar | DMG | ShiningSword
+    type DC = Fixed of int option | Dynamic
     type Choice =
         | AnalysisType of AnalysisType
         | EncounterMethod of EncounterMethod
         | Difficulty of Difficulty
         | DefenseMethod of DefenseMethod list
         | BypassMR of bool
-        | ChooseDC of Compute.DCComputer
+        | ChooseDC of DC
+        | PartySize of int
 type Model = {
     choices: Wizard.Choice list
     constructSettings: ConstructionSettings
@@ -29,5 +31,6 @@ type Model = {
 type Msg =
     | LoadCreatures of AsyncOperationStatus<Result<Header array, string>>
     | Evaluate of AsyncOperationStatus<Result<Graph, string>>
+    | UpdateSettings of ConstructionSettings * EvaluationSettings
     | Choose of Wizard.Choice
     | Reset

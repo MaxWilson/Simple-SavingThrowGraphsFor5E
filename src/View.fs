@@ -16,6 +16,54 @@ let header (txt: string) =
 module Settings =
     open Compute
     open Model.Wizard
+    let computeSettings choices =
+        let (|AnalysisChoice|_|) choices = choices |> List.tryPick((function AnalysisType(v) -> Some (v) | _ -> None))
+        let (|MethodChoice|_|) choices = choices |> List.tryPick((function EncounterMethod(v) -> Some (v) | _ -> None))
+        let (|MrChoice|_|) choices = choices |> List.tryPick((function BypassMR(v) -> Some (v) | _ -> None))
+        let (|DifficultyChoice|_|) choices = choices |> List.tryPick((function Difficulty(v) -> Some (v) | _ -> None))
+        let (|DefenseChoices|_|) choices = choices |> List.tryPick((function DefenseMethod(v) -> Some (v) | _ -> None))
+        let (|DcChoice|_|) choices = choices |> List.tryPick((function ChooseDC(v) -> Some (v) | _ -> None))
+        let (|PartySize|_|) choices = choices |> List.tryPick((function PartySize(v) -> Some (v) | _ -> None))
+        let (|Method|_|) = function
+            | AnalysisChoice PureCR -> Some Compute.PureCR
+            | AnalysisChoice Encounter & MethodChoice(method) & DifficultyChoice(diff) ->
+                match method, diff with
+                | Xanathar, (Easy | Medium | Hard as diff) -> Some <| Compute.Xanathar(Mixed, diff)
+                | DMG, diff -> Compute.DMG diff |> Some
+                | ShiningSword, diff -> Compute.ShiningSword diff |> Some
+                | _ -> None
+            | _ -> None
+        let (|DC|_|) = function DcChoice(Fixed(Some n)) -> Compute.Fixed n |> Some | DcChoice Dynamic -> Some Compute.Dynamic | _ -> None
+        let (|AttackTypes|_|) = function DefenseChoices(def) -> Some(def) | _ -> None
+        match choices with
+        | Method (Compute.PureCR as method) & DC dc & AttackTypes(attackTypes) ->
+            let constrSettings = {
+                ConstructionSettings.partySize = 1
+                sources = Compute.sources |> List.ofArray
+                creatureType = []
+                method = method
+                }
+            let evalSettings = {
+                EvaluationSettings.dcComputer = dc
+                abilities = [Str; Dex; Con; Int; Wis; Cha]
+                attackType = attackTypes
+                }
+            Some (constrSettings, evalSettings)
+        | PartySize partySize & Method method & DC dc & AttackTypes(attackTypes) ->
+            let constrSettings = {
+                ConstructionSettings.partySize = partySize
+                sources = Compute.sources |> List.ofArray
+                creatureType = []
+                method = method
+                }
+            let evalSettings = {
+                EvaluationSettings.dcComputer = dc
+                abilities = [Str; Dex; Con; Int; Wis; Cha]
+                attackType = attackTypes
+                }
+            Some (constrSettings, evalSettings)
+        | _ -> None
+
     let view (model: Model) dispatch =
         Bulma.section [
             let radioOfBase (id:string) child (isChecked: bool) msg =
@@ -44,6 +92,7 @@ module Settings =
                 ]
 
             if analysisChoice = Some Encounter then
+                Bulma.dropdownDivider []
                 let methodChoice = model.choices |> List.tryPick((function EncounterMethod(v) -> Some (v) | _ -> None))
                 header "How do you want to balance the encounters?"
                 group [
@@ -53,6 +102,7 @@ module Settings =
                     ]
                 if methodChoice.IsSome then
                     let difficultyChoice = model.choices |> List.tryPick((function Difficulty(v) -> Some (v) | _ -> None))
+                    Bulma.dropdownDivider []
                     header "What difficulty?"
                     group [
                         radioOf "easy" "Easy" (difficultyChoice = Some Easy) (Difficulty Easy)
@@ -62,6 +112,22 @@ module Settings =
                             radioOf "deadly" "Deadly" (difficultyChoice = Some Deadly) (Difficulty Deadly)
                         ]
 
+                    Bulma.dropdownDivider []
+                    header "How many PCs?"
+                    let partySize = model.choices |> List.tryPick((function PartySize(v) -> Some (v) | _ -> None))
+                    Bulma.input.number [
+                        prop.maxLength 2
+                        prop.style [style.maxWidth (length.em 7); style.verticalAlign.middle; style.marginLeft (length.em 2)]
+                        prop.placeholder "Party size"
+                        match partySize with Some dc -> prop.value (dc.ToString()) | _ -> ()
+                        prop.onChange(fun str ->
+                            match System.Int32.TryParse str with
+                            | true, n -> dispatch (Choose (PartySize n))
+                            | _ -> ()
+                            )
+                        ]
+
+            Bulma.dropdownDivider []
             header "Are you targeting saving throws, ability checks, or both?"
             let defenseChoice = model.choices |> List.tryPick((function DefenseMethod(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
             group [
@@ -70,6 +136,7 @@ module Settings =
                 ]
 
             if defenseChoice |> List.contains Save then
+                Bulma.dropdownDivider []
                 header "Do your attacks bypass magic resistance (e.g. Battlemaster maneuvers)?"
                 let mrChoice = model.choices |> List.tryPick((function BypassMR(v) -> Some (v) | _ -> None))
                 group [
@@ -78,6 +145,7 @@ module Settings =
                     ]
 
             if defenseChoice.Length > 0 then
+                Bulma.dropdownDivider []
                 header "Dynamic DC or fixed?"
                 let dcChoice = model.choices |> List.tryPick((function ChooseDC(v) -> Some (v) | _ -> None))
 
@@ -89,11 +157,12 @@ module Settings =
                             Bulma.input.number [
                                 prop.maxLength 2
                                 prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft (length.em 2)]
-                                prop.value (dc.ToString())
+                                prop.placeholder "DC"
+                                match dc with Some dc -> prop.value (dc.ToString()) | _ -> ()
                                 prop.onChange(fun str ->
                                     match System.Int32.TryParse str with
-                                    | true, n -> dispatch (Choose (ChooseDC (Fixed n)))
-                                    | _ -> ()
+                                    | true, n -> dispatch (Choose (ChooseDC (Fixed (Some n))))
+                                    | _ -> dispatch (Choose (ChooseDC (Fixed None)))
                                     )
                                 ]
                             ]
@@ -102,17 +171,22 @@ module Settings =
                 Bulma.field.div [
                     let bs = [
                         radioOf "dynamic" "Dynamic (based on PC level)" (dcChoice = Some Dynamic) (ChooseDC Dynamic)
-                        radioOfBase "fixed" fixedLabel (dcChoice |> function Some(Fixed _) -> true | _ -> false) (ChooseDC (Fixed 13))
+                        radioOfBase "fixed" fixedLabel (dcChoice |> function Some(Fixed _) -> true | _ -> false) (ChooseDC (Fixed None))
                         ]
                     for radio, label in bs do
                         radio
                         label
                     ]
 
-
+            let settings = (computeSettings model.choices)
             Bulma.button.button [
+                prop.disabled settings.IsNone
                 prop.onClick (fun ev ->
-                                Evaluate Started |> dispatch
+                                match settings with
+                                | Some settings ->
+                                    (UpdateSettings settings) |> dispatch
+                                    Evaluate Started |> dispatch
+                                | _ -> ()
                                 )
                 prop.text "Start"
                 ]

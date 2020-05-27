@@ -25,6 +25,8 @@ let update msg model =
         { model with analysis = NotStarted; choices = [] }, Cmd.Empty
     | Choose choice ->
         { model with choices = choice::model.choices }, Cmd.Empty
+    | UpdateSettings(c, e) ->
+        { model with constructSettings = c; evalSettings = e }, Cmd.Empty
     | LoadCreatures(Started) ->
         { model with creatures = InProgress }, Cmd.OfAsync.result (async {
             let! (statusCode, responseText) = Http.get "/creatures.json"

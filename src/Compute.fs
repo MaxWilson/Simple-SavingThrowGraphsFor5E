@@ -115,7 +115,7 @@ initialize (System.IO.File.ReadAllText(sprintf @"c:\code\saves\public\creatures.
 type Encounter = (int * Header) list
 type Difficulty = Easy | Medium | Hard | Deadly | Ludicrous
 type XanatharMethod = BiggestMob | Solo | MedianMob | RandomMob | Mixed
-type ConstructionMethod = PureCR | Xanathar of XanatharMethod | DMG of Difficulty | Balanced of Difficulty
+type ConstructionMethod = PureCR | Xanathar of XanatharMethod * Difficulty | DMG of Difficulty | ShiningSword of Difficulty
 type ConstructionSettings = {
     sources: string list // allowed sources, e.g. Volo's, MM
     partySize: int
