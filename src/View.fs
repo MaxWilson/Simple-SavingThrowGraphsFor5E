@@ -483,7 +483,7 @@ let view (model: Model) dispatch =
                                         let creatureTypeChoices = model.choices |> List.tryPick((function Model.Wizard.TypeFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
                                         vgroup [
                                             for creature in Compute.creatureTypes do
-                                                smallCheckboxOf dispatch ("chk" + creature) creature (sourceChoice.IsEmpty || creatureTypeChoices |> List.contains creature) (Model.Wizard.TypeFilter (toggle creatureTypeChoices creature) |> Choose)
+                                                smallCheckboxOf dispatch ("chk" + creature) creature (creatureTypeChoices.IsEmpty || creatureTypeChoices |> List.contains creature) (Model.Wizard.TypeFilter (toggle creatureTypeChoices creature) |> Choose)
                                             ]
                                         ]
                                     QuickView.footer [
