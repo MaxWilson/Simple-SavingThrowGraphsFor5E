@@ -146,44 +146,44 @@ type EvaluationSettings = {
     }
 type Evaluate = ConstructEncounter -> ConstructionSettings -> EvaluationSettings -> EvaluationResponse list
 
+let save (stat, save) =
+    match save with
+            | Some v -> v
+            | None -> (stat) / 2 - 5
+let stat (stat, _) = stat / 2 - 5
+let abilityOf m = function
+    | Str -> m.stats.str
+    | Dex -> m.stats.dex
+    | Con -> m.stats.con
+    | Int -> m.stats.int
+    | Wis -> m.stats.wis
+    | Cha -> m.stats.cha
+let hasAdvantage (defense:DefenseMethod) (ability: Ability) (m: Header) =
+    if m.stats.advantage = null then (defense = Save && m.stats.magicResistance)
+    else
+        let adv txt = m.stats.advantage.ToLowerInvariant().Contains(txt)
+        (match ability with
+            | Str -> adv "strength"
+            | Dex -> adv "dexterity"
+            | Con -> adv "constitution"
+            | Int -> adv "intelligence"
+            | Wis -> adv "wisdom"
+            | Cha -> adv "charisma")
+        || (defense = Save && m.stats.magicResistance)
+
 let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : float =
     let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
     let effectivenessOfDefense (m: Header) defense =
-        let save (stat, save) =
-            match save with
-                    | Some v -> v
-                    | None -> (stat) / 2 - 5
-        let stat (stat, _) = stat / 2 - 5
-        let ab = match ability with
-                    | Str -> m.stats.str
-                    | Dex -> m.stats.dex
-                    | Con -> m.stats.con
-                    | Int -> m.stats.int
-                    | Wis -> m.stats.wis
-                    | Cha -> m.stats.cha
-        let hasAdvantage =
-            if m.stats.advantage = null then false
-            else
-                let adv txt = m.stats.advantage.ToLowerInvariant().Contains(txt)
-                match ability with
-                    | Str -> adv "strength"
-                    | Dex -> adv "dexterity"
-                    | Con -> adv "constitution"
-                    | Int -> adv "intelligence"
-                    | Wis -> adv "wisdom"
-                    | Cha -> adv "charisma"
         let success bonus dc =
             min 1. (max 0. (float (dc - bonus) / 20.))
         let sq v = v * v
         match defense with
-        | Save when m.stats.magicResistance ->
-            (success (save ab) dc) |> sq
         | Save | NonmagicalSave ->
-            if hasAdvantage then
-                (success (save ab) dc) |> sq
+            if hasAdvantage defense ability m then
+                (success (abilityOf m ability |> save) dc) |> sq
             else
-                (success (save ab) dc)
-        | Check -> success (stat ab) dc
+                (success (abilityOf m ability |> save) dc)
+        | Check -> success (abilityOf m ability |> stat) dc
     let numberAffected =
         match a with
         | SingleTarget d -> encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max

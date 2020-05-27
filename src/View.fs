@@ -156,6 +156,49 @@ module Settings =
                             | _ -> ()
                             )
                         ]
+            Bulma.dropdownDivider []
+            header "Can your attack hit more than one target?"
+            let targetingChoice = model.choices |> List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
+            let aoeLabel =
+                match targetingChoice with
+                | Some(AoE(maxTargets, maxPct)) ->
+                    Html.span [
+                        header "AoE that hits up to"
+                        Bulma.input.number [
+                            prop.maxLength 4
+                            prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
+                            prop.placeholder "50%"
+                            prop.value (maxPct.ToString())
+                            prop.onChange(fun str ->
+                                match System.Double.TryParse str with
+                                | true, n -> dispatch (Choose (TargetingChoice (AoE(maxTargets, n))))
+                                | _ -> ()
+                                )
+                            ]
+                        header "% of enemies, p to a maximum of"
+                        Bulma.input.number [
+                            prop.maxLength 4
+                            prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
+                            prop.placeholder "max number"
+                            prop.value (maxTargets.ToString())
+                            prop.onChange(fun str ->
+                                match System.Double.TryParse str with
+                                | true, n -> dispatch (Choose (TargetingChoice (AoE(n, maxPct))))
+                                | _ -> ()
+                                )
+                            ]
+                        ]
+                | _ -> Html.text "Fixed DC"
+                |> prop.children
+            Bulma.field.div [
+                let bs = [
+                    radioOf "singleTarget" "Single Target" (match targetingChoice with Some(Single(_)) -> true | _ -> false) (TargetingChoice Single)
+                    radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8., 50.)))
+                    ]
+                for radio, label in bs do
+                    radio
+                    label
+                ]
 
             Bulma.dropdownDivider []
             header "Are you targeting saving throws, ability checks, or both?"
@@ -233,14 +276,23 @@ module Graph =
             | Wis -> (153, 0, 153) // purple
             | Cha -> (255, 255, 0) // yellow
         if background then color.rgba(r,g,b,0.1) else color.rgb(r,g,b)
-    let describeEncounter (ability: Ability) (encounter: Encounter) effectiveness =
+    let describeEncounter (ability: Ability) (defense:DefenseMethod) (dc: int) (encounter: Encounter) effectiveness =
         let txt =
             System.String.Join(" and ",
                 encounter
                 |> List.map (fun (number, m) ->
-                    if number = 1 then m.name
-                    else sprintf "%d %ss" number m.name))
-        sprintf "%A vs. %s: %.1f%% effective" ability txt effectiveness
+                    let modifier =
+                        match defense with
+                        | Save | NonmagicalSave ->
+                            if hasAdvantage defense ability m then
+                                sprintf "(%+i, advantage)" (abilityOf m ability |> save)
+                            else
+                                sprintf "(%+i)" (abilityOf m ability |> save)
+                        | Check ->
+                            sprintf "(%+i)" (abilityOf m ability |> stat)
+                    if number = 1 then sprintf "%s %s" m.name modifier
+                    else sprintf "%d %ss %s" number m.name modifier))
+        sprintf "DC %d %A %s vs. %s: %.1f%% effective" dc ability (if defense = Check then "check" else "save") txt effectiveness
     let myplot model traces =
         Plotly.plot [
             plot.style [style.margin 20]
@@ -278,10 +330,12 @@ module Graph =
                 let fill = colorOf resp.ability true
                 let myColor = colorOf resp.ability false
                 let data = resp.results
+                let defense = match resp.attack with | SingleTarget d | AoE(d,_,_) -> d
                 // in this case we're going to ignore best/worst and just plot ALL the marks
                 let evaluateEncounter lvl encounter =
-                    let effectiveness = Compute.calculateEffectiveness resp.attack resp.ability (Compute.dcOf model.evalSettings.dcComputer lvl) encounter
-                    let label = describeEncounter resp.ability encounter effectiveness
+                    let dc = (Compute.dcOf model.evalSettings.dcComputer lvl)
+                    let effectiveness = Compute.calculateEffectiveness resp.attack resp.ability dc encounter
+                    let label = describeEncounter resp.ability defense dc encounter effectiveness
                     {| x = lvl; y = effectiveness; label = label |}
                 let marks = data |> List.collect(fun { pcLevel = lvl; average = Result(_, encounters) } -> encounters |> List.map (evaluateEncounter lvl))
                 let averageMarks = (data |> List.map (fun lr -> lr.pcLevel, lr.average))
@@ -322,6 +376,7 @@ module Graph =
             [for resp in results do
                 let fill = colorOf resp.ability true
                 let myColor = colorOf resp.ability false
+                let defense = match resp.attack with | SingleTarget d | AoE(d,_,_) -> d
                 let data = resp.results
                 let bestMarks = (data |> List.map (fun lr -> lr.pcLevel, lr.best))
                 let worstMarks = (data |> List.map (fun lr -> lr.pcLevel, lr.worst))
@@ -330,12 +385,13 @@ module Graph =
                     let marks = bestMarks @ worstMarks
                     let xs = marks |> List.map fst
                     let ys = marks |> List.map (fun (_, Result(effectiveness, _)) -> effectiveness)
+                    let dcOf = Compute.dcOf model.evalSettings.dcComputer
 
                     traces.scatter [
                         scatter.x xs
                         scatter.y ys
                         scatter.marker (marks |> List.map (fun _ -> marker.color myColor))
-                        scatter.text (marks |> List.map (fun (_, Result(effectiveness, encounters)) -> describeEncounter resp.ability (encounters |> List.exactlyOne) effectiveness))
+                        scatter.text (marks |> List.map (fun (lvl, Result(effectiveness, encounters)) -> describeEncounter resp.ability defense (dcOf lvl) (encounters |> List.exactlyOne) effectiveness))
                         scatter.hoverinfo.text
                         scatter.showlegend false
                         scatter.hoveron.points
