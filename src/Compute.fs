@@ -52,7 +52,7 @@ let sources = [|"Out of the Abyss"; "Princes of the Apocalypse";
     "Princes of the Apocalypse Online Supplement v1"; "Basic Rules v1";
     "HotDQ supplement"; "Player's Handbook"; "Mordenkainen's Tome of Foes";
     "Storm King's Thunder"; "Curse of Strahd"; "Tales from the Yawning Portal";
-    "Tomb of Annihilation"; "The Tortle Package"; "Volo's Guide to Monsters";
+    "Tomb of Annihilation"; "Volo's Guide to Monsters";
     "Eberron - Rising from the Last War"|]
 let mutable creatureTypes = [||]
 let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 1. .. 30.]
