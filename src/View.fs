@@ -266,6 +266,7 @@ module Graph =
                     yaxis.tickcolor (color.rgb(127, 127, 127))
                     yaxis.ticks.outside
                     yaxis.zeroline false
+                    yaxis.range [0.; 100.] // by default always want 0-100% effectiveness to avoid misleading
                 ]
                 layout.hovermode.closest
             ]
