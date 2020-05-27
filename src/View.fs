@@ -8,17 +8,17 @@ open Feliz.Bulma.Checkradio
 open Feliz.Bulma.Switch
 
 let header (txt: string) =
-    Html.text [
+    Html.span [
         prop.className "is-large"
         prop.text txt
         ]
 let radioOfBase dispatch (id:string) child (isChecked: bool) msg =
-    Checkradio.radio [ prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch msg)]
+    Checkradio.radio [ prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
     ,Html.label [ prop.htmlFor id; child ]
 let radioOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
     radioOfBase dispatch id (prop.text txt) isChecked msg
 let checkboxOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
-    Switch.checkbox [ Checkradio.checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onClick (fun _ -> dispatch msg)]
+    Switch.checkbox [ Checkradio.checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
     ,Html.label [ prop.htmlFor id; prop.text txt ]
 let group (bs: (ReactElement * ReactElement) list) =
     Bulma.field.p [
@@ -373,7 +373,11 @@ let view (model: Model) dispatch =
                     ]
             | Resolved (Ok graph) ->
                 Bulma.section [
-                    Graph.overview model graph dispatch
+                    match model.focus with
+                    | Some ability ->
+                        Graph.focused model ability graph dispatch
+                    | None ->
+                        Graph.overview model graph dispatch
                     Bulma.dropdownDivider[]
                     group [
                         radioOf dispatch "overview" "Overview" (model.focus = None) (SetFocus None)
