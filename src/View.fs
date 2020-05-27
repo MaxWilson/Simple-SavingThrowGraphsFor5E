@@ -213,11 +213,11 @@ module Settings =
 
             if defenseChoice |> List.contains Save then
                 Bulma.dropdownDivider []
-                header "Do your attacks bypass magic resistance (e.g. Battlemaster maneuvers)?"
+                header "Are your attacks affected by magic resistance?"
                 let mrChoice = model.choices |> List.tryPick((function BypassMR(v) -> Some (v) | _ -> None))
                 group [
-                    radioOf "normalMr" "No, they are magical" (mrChoice = Some false) (BypassMR false)
-                    radioOf "bypassMR" "Yes, they are nonmagical" (mrChoice = Some true) (BypassMR true)
+                    radioOf "normalMr" "Yes, they are magical (e.g. spells)" (mrChoice = Some false) (BypassMR false)
+                    radioOf "bypassMR" "No, they are nonmagical (e.g. Battlemaster maneuvers)" (mrChoice = Some true) (BypassMR true)
                     ]
 
             if defenseChoice.Length > 0 then
