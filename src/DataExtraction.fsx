@@ -1,4 +1,16 @@
-﻿open System
+﻿#if NugetReferencePerfBugIsFixed // can comment back in once the perf bug is fixed, otherwise run it manually even though it's commented out
+
+#r "nuget: Thoth.Json.Net"
+open Thoth.Json.Net
+let encode x = Thoth.Json.Net.Encode.Auto.toString<'t>(0, x)
+let decode = match Thoth.Json.Net.Decode.Auto.fromString<'t> with Ok v -> v | Error msg -> failwithf "Error deserializing! %s" msg
+*)
+#else
+// we don't really use these implementations
+let encode x : string = failwith "Not implemented"
+let decode<'t> (input:string) : 't = failwith "Not implemented"
+#endif
+open System
 open System.IO
 open System.Text.RegularExpressions
 type Row = {
@@ -29,6 +41,7 @@ type Row = {
     damageImmunities: string
     damageVuln: string
     conditionImmunities: string list
+    legendaryResistance: int option
     }
 type KoboldRow = {
     name: string
@@ -58,6 +71,8 @@ type Creature = { name: string; txt: string; mutable saves: (string * int) list 
 let ptags = "tags:\s*\[([\w\s ,]+)"
 let pname = "name:\s*\"([\w '()\-,'/]+)\""
 let creatures = files |> Seq.map System.IO.File.ReadAllText |> Seq.map (function RE pname [name] as txt -> name, txt | txt -> printfn "%s" txt; failwithf "No match for %s" (txt.Substring(0, 50))) |>  Map.ofSeq
+System.IO.File.WriteAllText(@"c:\code\saves\markdown.json", creatures |> encode)
+
 
 let getSaves name (txt: string) =
     let lines = txt.Split('\n')
@@ -171,17 +186,12 @@ let parseRow a =
         damageImmunities = strStat "damage_immunities"
         damageResistances = strStat "damage_resistances"
         damageVuln = strStat "damage_vulnerabilities"
+        legendaryResistance = match a.txt with RE "Legendary Resistance \(([0-9])/Day\)" [n] -> Some (System.Int32.Parse n) | _ -> None
         }
 // For entries like "Demonic Boon Template" we don't care if they can't be parsed, they won't be used anyway
 let all = annotations |> Seq.map (fun (KeyValue(_, notes)) -> notes) |> Seq.sortBy (fun a -> a.name) |> Seq.choose (fun x -> try parseRow x |> Some with _ when x.name.Contains "Template" -> None) |> Array.ofSeq
 
-// have to leave this part commented out because it slows down VS intellisense perf something awful, but this is how you load Newtonsoft.Json
-(*
-#r "nuget: Newtonsoft.Json"
-open Newtonsoft.Json
-*)
-
-System.IO.File.WriteAllText(@"c:\code\saves\annotations.json", all |> JsonConvert.SerializeObject)
+System.IO.File.WriteAllText(@"c:\code\saves\annotations.json", all |> encode)
 
 
 let readField (str: string) startIx =
@@ -263,9 +273,9 @@ let mutable allMonsters =
     @ loadExt "c:\code\saves\kfc eberron last war - Monsters.csv"
 
 let save () =
-    System.IO.File.WriteAllText(sprintf @"c:\code\saves\data.json", JsonConvert.SerializeObject allMonsters)
+    System.IO.File.WriteAllText(@"c:\code\saves\data.json", encode allMonsters)
 let load () =
-    allMonsters <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\data.json") |> JsonConvert.DeserializeObject<KoboldRow list>
+    allMonsters <- System.IO.File.ReadAllText(sprintf @"c:\code\saves\data.json") |> decode<KoboldRow list>
 
 let mutable currentRow = allMonsters.Head
 let correct name src =
@@ -313,7 +323,7 @@ for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
 // remove monsters that aren't real monsters deserving of a separate entry
 save()
 
-type SavingThrow = Str of int | Dex of int | Con of int | Int of int | Wis of int | Cha of int | MR | Advantage of string
+type SavingThrow = Str of int | Dex of int | Con of int | Int of int | Wis of int | Cha of int | MR | Advantage of string | Legendary of int
 type Condition = Blinded | Charmed | Exhaustion | Frightened | Poisoned | Prone | Restrained | Deafened | Paralyzed | Unconscious | Petrified | Stunned | Grappled | Incapacitated
 type Resist = Vuln of string | Resist of string | Immune of string | Conditions of Condition list
 type Prof = Arcana | History | Insight | Religion | Performance | Perception | Persuasion | Stealth | Acrobatics | Deception | Athletics | Intimidation | Medicine | Nature | Sleight | Survival
@@ -364,12 +374,13 @@ let supplyStats args =
             dcInt = dc |> List.tryPick(function Int x -> Some x | _ -> None)
             dcWis = dc |> List.tryPick(function Wis x -> Some x | _ -> None)
             dcCha = dc |> List.tryPick(function Cha x -> Some x | _ -> None)
+            legendaryResistance = saves |> List.tryPick(function (Legendary x) -> Some x | _ -> None)
             }
 
 supplyStats ("Giant Ice Toad", 14, 52, 16, 13, 14, 8, 10, 6, [], "30 ft.", [], [], []) // Tales from the Yawning Portal: 235
 supplyStats ("Giant Skeleton", 17, 115, 21, 10, 20, 4, 6, 6, [], "30 ft.", [], [Vuln "bludgeoning"; Immune "poison"; Conditions [Exhaustion; Poisoned]], []) // Tales from the Yawning Portal: 236
 supplyStats ("Thayan Apprentice", 12, 27, 10, 14, 12, 15, 13, 11, [], "30 ft.", [Arcana, 4], [], []) // Tales from the Yawning Portal: 245
-supplyStats ("Acererak", 21, 285, 13, 16, 20, 27, 21, 20, [Con 12; Int 15; Wis 12], "30 ft.", [Arcana, 22; History, 22; Insight, 12; Perception, 12; Religion, 15], [], [Con 23; Wis 20]) // Tomb of Annihilation: 209
+supplyStats ("Acererak", 21, 285, 13, 16, 20, 27, 21, 20, [Con 12; Int 15; Wis 12; Legendary 3], "30 ft.", [Arcana, 22; History, 22; Insight, 12; Perception, 12; Religion, 15], [], [Con 23; Wis 20]) // Tomb of Annihilation: 209
 supplyStats ("Tabaxi Ministrel", 12, 22, 10, 15, 11, 14, 12, 16, [], "30 ft., climb 20 ft.", [Perception, 3; Performance, 7; Persuasion, 5; Stealth, 4], [Resist "cold, lightning"; Immune "necrotic, poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned; Stunned]], []) // Tomb of Annihilation: 233
 supplyStats ("Belashyrra", 19, 304, 24, 21, 20, 25, 22, 23, [Int 14; Wis 13; Cha 13; MR], "40 ft., fly 40 ft. (hover)", [Arcana, 14; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Int 22; Con 22]) // Eberron - Rising from the Last War: 286
 supplyStats ("Dyrrn", 21, 325, 26, 21, 22, 26, 23, 24, [Int 15; Wis 13; Cha 14; MR], "40 ft., fly 40 ft. (hover).", [Arcana, 15; History, 15; Insight, 13; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Con 23; Int 23]) // Eberron - Rising from the Last War: 288
@@ -382,14 +393,14 @@ supplyStats ("Expeditious Messenger", 13, 7, 6, 16, 13, 8, 12, 7, [], "25 ft., f
 supplyStats ("Iron Defender", 17, 30, 16, 14, 16, 8, 11, 7, [], "40 ft.", [Perception, 3; Stealth, 4], [Immune "poison"; Conditions [Exhaustion; Poisoned]], [Str 13]) // Eberron - Rising from the Last War: 293
 supplyStats ("Inspired", 12, 40, 11, 14, 10, 16, 10, 16, [Int 5; Wis 2; Advantage "Wisdom"], "30 ft.", [Deception, 7; Insight, 2; Persuasion, 7], [Resist "psychic"; Conditions [Charmed; Frightened]], [Wis 13]) // Eberron - Rising from the Last War: 294
 supplyStats ("Karrnathi Undead Soldier", 17, 52, 16, 14, 16, 12, 13, 5, [], "30 ft.", [Athletics, 5; Perception, 5], [Resist "cold, poison"; Conditions [Charmed; Frightened; Poisoned]], []) // Eberron - Rising from the Last War: 295
-supplyStats ("Lady Illmarrow", 19, 199, 16, 16, 20, 27, 21, 24, [Con 12; Int 15; Wis 12; MR], "30 ft., fly 40 ft.", [Arcana, 15; History, 15; Insight, 12; Perception, 12], [Resist "cold, lightning"; Immune "necrotic, poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned; Stunned]], [Con 20; Wis 20]) // Eberron - Rising from the Last War: 297
+supplyStats ("Lady Illmarrow", 19, 199, 16, 16, 20, 27, 21, 24, [Con 12; Int 15; Wis 12; MR; Legendary 3], "30 ft., fly 40 ft.", [Arcana, 15; History, 15; Insight, 12; Perception, 12], [Resist "cold, lightning"; Immune "necrotic, poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned; Stunned]], [Con 20; Wis 20]) // Eberron - Rising from the Last War: 297
 supplyStats ("Living Burning Hands", 15, 15, 10, 12, 16, 3, 6, 6, [MR], "25 ft., fly 25 ft. (hover)", [], [Resist "bludgeoning, piercing, and slashing from nonmagical attacks"; Immune "fire"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Grappled; Poisoned; Prone]], [Dex 13]) // Eberron - Rising from the Last War: 298
 supplyStats ("Living Lightning Bolt", 15, 57, 10, 15, 18, 3, 10, 6, [MR], "25 ft., fly 25 ft. (hover)", [], [Resist "bludgeoning, piercing, and slashing from nonmagical attacks"; Immune "fire"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Grappled; Poisoned; Prone]], [Dex 15]) // Eberron - Rising from the Last War: 299
 supplyStats ("Living Cloudkill", 15, 73, 10, 15, 14, 3, 11, 6, [], "25 ft., fly 25 ft. (hover)", [], [Resist "bludgeoning, piercing, and slashing from nonmagical attacks"; Immune "fire"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Grappled; Poisoned; Prone]], [Con 16]) // Eberron - Rising from the Last War: 299
 supplyStats ("The Lord of Blades", 19, 195, 20, 15, 18, 19, 17, 18, [Str 11; Con 10; Int 10; Wis 9; Advantage "poison"], "40 ft.", [Arcana, 10; Athletics, 11; History, 10; Perception, 9], [Resist "necrotic, poison"; Conditions [Charmed; Exhaustion; Frightened]], [Str 19]) // Eberron - Rising from the Last War: 300
 supplyStats ("Mordakhesh", 18, 170, 20, 16, 18, 15, 17, 20, [Str 10; Con 9; Wis 8; Cha 10; MR], "40 ft.", [Athletics, 10; Insight, 8; Perception, 8; Persuasion, 10], [Vuln "piercing from magic weapons wielded by good creatures"; Resist "bludgeoning, piercing, and slashing from nonmagical attacks not made with silvered weapons"], [Wis 18; Con 18]) // Eberron - Rising from the Last War: 301
-supplyStats ("Rak Tulkhesh", 23, 478, 29, 19, 27, 21, 22, 26, [Str 17; Con 16; Wis 14; Cha 16; MR], "40 ft., climb 40 ft., fly 80 ft.", [Athletics, 17; Intimidation, 16; Perception, 14], [Resist "cold, fire, lightning"; Immune "poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Poisoned; Stunned]], [Wis 24; Con 24]) // Eberron - Rising from the Last War: 303
-supplyStats ("Sul Khatesh", 22, 475, 18, 21, 19, 30, 22, 25, [Con 12; Int 18; Wis 14; Cha 15; MR; Advantage "concentration"], "40 ft., fly 40 ft. (hover)", [Arcana, 18; History, 18; Insight, 14; Religion, 18], [Resist "cold, fire, lightning"; Immune "poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned]], [Wis 26; Dex 26; Con 26]) // Eberron - Rising from the Last War: 304
+supplyStats ("Rak Tulkhesh", 23, 478, 29, 19, 27, 21, 22, 26, [Str 17; Con 16; Wis 14; Cha 16; MR; Legendary 3], "40 ft., climb 40 ft., fly 80 ft.", [Athletics, 17; Intimidation, 16; Perception, 14], [Resist "cold, fire, lightning"; Immune "poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Poisoned; Stunned]], [Wis 24; Con 24]) // Eberron - Rising from the Last War: 303
+supplyStats ("Sul Khatesh", 22, 475, 18, 21, 19, 30, 22, 25, [Con 12; Int 18; Wis 14; Cha 15; MR; Legendary 3; Advantage "concentration"], "40 ft., fly 40 ft. (hover)", [Arcana, 18; History, 18; Insight, 14; Religion, 18], [Resist "cold, fire, lightning"; Immune "poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Charmed; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned]], [Wis 26; Dex 26; Con 26]) // Eberron - Rising from the Last War: 304
 supplyStats ("Hashalaq Quori", 17, 99, 12, 14, 13, 18, 16, 18, [Wis 7; Cha 8], "40 ft.", [Arcana, 12; History, 12; Insight, 12; Persuasion, 8], [Resist "psychic"; Conditions [Charmed; Frightened]], [Wis 16; Int 16; Cha 16]) // Eberron - Rising from the Last War: 305
 supplyStats ("Kalaraq Quori", 18, 161, 12, 21, 18, 23, 24, 25, [Int 12; Wis 13; Cha 13; MR], "30 ft., fly 60 ft. (hover)", [Deception, 13; Perception, 13; Persuasion, 13], [Resist "cold, necrotic, poison, psychic, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Grappled; Paralyzed; Petrified; Prone; Restrained]], [Int 21; Wis 21; Cha 21]) // Eberron - Rising from the Last War: 306
 supplyStats ("Tsucora Quori", 16, 68, 17, 14, 18, 14, 14, 16, [Wis 5; Cha 6], "40 ft.", [Insight, 5; Perception, 6], [Resist "psychic"; Conditions [Charmed; Frightened]], [Wis 14; Cha 14]) // Eberron - Rising from the Last War: 307
@@ -432,5 +443,5 @@ allMonsters <- allMonsters |> List.filter (fun m -> m.stats.IsSome)
 // #r "nuget: Thoth.Json.Net"
 // open Thoth.Json.Net
 // put the data in a format that we can easily parse at runtime (Thoth, not Newtonsoft)
-Encode.Auto.toString(0,allMonsters) |> fun json -> System.IO.File.WriteAllText(@"c:\code\saves\public\creatures.json", json)
+System.IO.File.WriteAllText(@"c:\code\saves\public\creatures.json", allMonsters |> encode)
 
