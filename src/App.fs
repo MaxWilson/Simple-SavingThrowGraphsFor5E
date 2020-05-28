@@ -15,6 +15,7 @@ let fresh =
         abilities = []
         attackType = []
         dcComputer = Dynamic
+        scaleEffectivenessDownByLegendaryResistance = false
         }
     creatures = NotStarted
     analysis = NotStarted

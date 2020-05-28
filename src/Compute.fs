@@ -28,6 +28,7 @@ type Stats = {
     damageImmunities: string
     damageVuln: string
     conditionImmunities: string list
+    legendaryResistance: int option
     }
 type Header = {
     name: string
@@ -91,6 +92,7 @@ let statsDecoder : Decoder<Stats> =
         damageImmunities = get.Optional.At ["damageImmunities"] Decode.string |> Option.defaultValue null
         damageVuln = get.Optional.At ["damageVuln"] Decode.string |> Option.defaultValue null
         conditionImmunities = get.Optional.At ["conditionImmunities"] (Decode.list Decode.string) |> Option.defaultValue []
+        legendaryResistance = get.Optional.At ["legendaryResistance"] Decode.int
     })
 let headerDecoder : Decoder<Header> =
     Decode.object(fun get -> {
@@ -143,6 +145,7 @@ type EvaluationSettings = {
     abilities: Ability list
     attackType: Attack list
     dcComputer: DCComputer
+    scaleEffectivenessDownByLegendaryResistance: bool
     }
 type Evaluate = ConstructEncounter -> ConstructionSettings -> EvaluationSettings -> EvaluationResponse list
 
@@ -171,7 +174,7 @@ let hasAdvantage (defense:DefenseMethod) (ability: Ability) (m: Header) =
             | Cha -> adv "charisma")
         || (defense = Save && m.stats.magicResistance)
 
-let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : float =
+let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : float =
     let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
     let effectivenessOfDefense (m: Header) defense =
         let success bonus dc =
@@ -179,17 +182,19 @@ let calculateEffectiveness (a: Attack) (ability: Ability) (dc: int) (encounter: 
         let sq v = v * v
         match defense with
         | Save | NonmagicalSave ->
-            if hasAdvantage defense ability m then
-                (success (abilityOf m ability |> save) dc) |> sq
+            let baseRate = (success (abilityOf m ability |> save) dc)
+            let effectiveness = if hasAdvantage defense ability m then sq baseRate else baseRate
+            if scaleByLR = false then effectiveness
             else
-                (success (abilityOf m ability |> save) dc)
+                match m.stats.legendaryResistance with
+                | Some n -> (effectiveness / (float n + 1.))
+                | None -> effectiveness
         | Check -> success (abilityOf m ability |> stat) dc
     let numberAffected =
         match a with
         | SingleTarget d -> encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max
         | AoE(d, maxTargets, maxPct) ->
             let enemies = encounter |> List.collect(fun (n,m) -> let e = effectivenessOfDefense m d in List.init n (fun _ -> e))
-            printfn "%A" enemies
             if enemies.Length <= 1 then enemies.Head
             else
                 enemies |> List.sortDescending |> List.take(min (float enemies.Length * maxPct/100. |> int) maxTargets)
@@ -239,12 +244,12 @@ let eval: Evaluate = fun construct constructSettings evalSettings ->
 
                     let encounters = encountersByLevel.[level]
                     let by f =
-                            let c = (calculateEffectiveness attack ability dc)
+                            let c = (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc)
                             let e = encounters |> f c
                             in Result(c e, [e])
                     if not encounters.IsEmpty then {
                         pcLevel = level
-                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness attack ability dc), encounters)
+                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc), encounters)
                         best = by Seq.maxBy
                         worst = by Seq.minBy
                         }

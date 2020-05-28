@@ -55,7 +55,7 @@ module Settings =
         let (|DefenseChoices|_|) choices = choices |> List.tryPick((function DefenseMethod(v) -> Some (v) | _ -> None))
         let (|DcChoice|_|) choices = choices |> List.tryPick((function ChooseDC(v) -> Some (v) | _ -> None))
         let (|PartySize|_|) choices = choices |> List.tryPick((function PartySize(v) -> Some (v) | _ -> None))
-        let (|TargetingChoice|_|) choices = choices |> List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
+        let (|TargetingChoice|_|) = List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
         let (|Method|_|) = function
             | AnalysisChoice PureCR -> Some Compute.PureCR
             | AnalysisChoice Encounter & MethodChoice(method) & DifficultyChoice(diff) ->
@@ -65,6 +65,8 @@ module Settings =
                 | ShiningSword, diff -> Compute.ShiningSword diff |> Some
                 | _ -> None
             | _ -> None
+        let (|LRChoice|_|) = List.tryPick((function ScaleByLegendaryResist(v) -> Some v | _ -> None))
+        let (|LR|_|) = function LRChoice(v) -> Some v | DefenseChoices [Check] -> Some false | _ -> None
         let (|DC|_|) = function DcChoice(Fixed(Some n)) -> Compute.Fixed n |> Some | DcChoice Dynamic -> Some Compute.Dynamic | _ -> None
         let (|AttackTypes|_|) = function
             | DefenseChoices(def) & (TargetingChoice(Single) | AnalysisChoice PureCR) -> Some(def |> List.map SingleTarget)
@@ -73,7 +75,7 @@ module Settings =
         let sources = choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> (function None | Some [] -> (Compute.sources |> List.ofArray) | Some src -> src)
         let creatureTypes = choices |> List.tryPick((function TypeFilter(v) -> Some (v) | _ -> None)) |> Option.defaultValue []
         match choices with
-        | Method (Compute.PureCR as method) & DC dc & AttackTypes(attackTypes) ->
+        | Method (Compute.PureCR as method) & DC dc & AttackTypes(attackTypes) & LR(lrScale) ->
             let constrSettings = {
                 ConstructionSettings.partySize = 1
                 sources = sources
@@ -84,9 +86,10 @@ module Settings =
                 EvaluationSettings.dcComputer = dc
                 abilities = [Str; Dex; Con; Int; Wis; Cha]
                 attackType = attackTypes
+                scaleEffectivenessDownByLegendaryResistance = lrScale
                 }
             Some (constrSettings, evalSettings)
-        | PartySize partySize & Method method & DC dc & AttackTypes(attackTypes) ->
+        | PartySize partySize & Method method & DC dc & AttackTypes(attackTypes) & LR(lrScale) ->
             let constrSettings = {
                 ConstructionSettings.partySize = partySize
                 sources = sources
@@ -97,6 +100,7 @@ module Settings =
                 EvaluationSettings.dcComputer = dc
                 abilities = [Str; Dex; Con; Int; Wis; Cha]
                 attackType = attackTypes
+                scaleEffectivenessDownByLegendaryResistance = lrScale
                 }
             Some (constrSettings, evalSettings)
         | _ -> None
@@ -219,6 +223,15 @@ module Settings =
                     radioOf "normalMr" "Yes, they are magical (e.g. spells)" (mrChoice = Some false) (BypassMR false)
                     radioOf "bypassMR" "No, they are nonmagical (e.g. Battlemaster maneuvers)" (mrChoice = Some true) (BypassMR true)
                     ]
+                header "How would you like to count legendary resistance?"
+                let lrChoice = model.choices |> List.tryPick((function ScaleByLegendaryResist(v) -> Some (v) | _ -> None))
+                group [
+                    radioOf "normalLR" "Ignore (just show chance of a single saving throw failure)" (lrChoice = Some false) (ScaleByLegendaryResist false)
+                    radioOf "effectiveLR" "Reduced effectiveness" (lrChoice = Some true) (ScaleByLegendaryResist true)
+                    ]
+                if lrChoice = Some true then
+                    header "Effectiveness graph will be divided by the number of saves the creature has to fail to be affected. \
+                        For example, a spell that is 100% effective will be shown as 25% effective if the creature has Legendary Resistance (3/Day)."
 
             if defenseChoice.Length > 0 then
                 Bulma.dropdownDivider []
@@ -331,6 +344,7 @@ module Graph =
         ]
     let focused (model: Model) ability (graph: Graph) dispatch =
         let results = graph.results
+        let lr = model.evalSettings.scaleEffectivenessDownByLegendaryResistance
         let traces =
             [for resp in results |> List.filter (fun r -> r.ability = ability) do
                 let fill = colorOf resp.ability true
@@ -340,10 +354,18 @@ module Graph =
                 // in this case we're going to ignore best/worst and just plot ALL the marks
                 let evaluateEncounter lvl encounter =
                     let dc = (Compute.dcOf model.evalSettings.dcComputer lvl)
-                    let effectiveness = Compute.calculateEffectiveness resp.attack resp.ability dc encounter
+                    let effectiveness = Compute.calculateEffectiveness lr resp.attack resp.ability dc encounter
                     let label = describeEncounter resp.ability defense dc encounter effectiveness
                     {| x = lvl; y = effectiveness; label = label |}
                 let marks = data |> List.collect(fun { pcLevel = lvl; average = Result(_, encounters) } -> encounters |> List.map (evaluateEncounter lvl))
+                            |> List.groupBy(fun d -> d.x, d.y)
+                            |> List.map(fun ((x,y), entries) ->
+                                // If multiple monsters are on the same dot, we want to show them all
+                                match entries with
+                                | [singleEntry] -> singleEntry // no need to aggregate
+                                | entries ->
+                                    let jointLabel = System.String.Join("<br>", entries |> List.map(fun d -> d.label))
+                                    {| x = x; y = y; label = jointLabel|})
                 let averageMarks = (data |> List.map (fun lr -> lr.pcLevel, lr.average))
                 let hover =
                     let xs = marks |> List.map (fun d -> d.x)

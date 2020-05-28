@@ -24,6 +24,7 @@ module Wizard =
         | PartySize of int
         | SourceFilter of string list
         | TypeFilter of string list
+        | ScaleByLegendaryResist of bool
 type Model = {
     choices: Wizard.Choice list
     constructSettings: ConstructionSettings

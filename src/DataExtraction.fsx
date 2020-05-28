@@ -3,7 +3,7 @@
 #r "nuget: Thoth.Json.Net"
 open Thoth.Json.Net
 let encode x = Thoth.Json.Net.Encode.Auto.toString<'t>(0, x)
-let decode = match Thoth.Json.Net.Decode.Auto.fromString<'t> with Ok v -> v | Error msg -> failwithf "Error deserializing! %s" msg
+let decode x = match Thoth.Json.Net.Decode.Auto.fromString<'t> x with Ok v -> v | Error msg -> failwithf "Error deserializing! %s" msg
 *)
 #else
 // we don't really use these implementations
@@ -302,26 +302,6 @@ let toCr = function
     | 0.25 -> "1/4"
     | 0.5 -> "1/2"
     | n -> n.ToString()
-for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
-    if m.stats.IsNone then
-        currentRow <- m
-        let row = match annotations.TryFind(m.name) with
-                    | Some row -> Some row
-                    | None ->
-                        annotations |> Seq.tryPick (fun (KeyValue(name, data)) -> if name.StartsWith(Regex.Replace(m.name, " \((in lair|coven)\)", ""), System.StringComparison.InvariantCultureIgnoreCase) then Some data else None)
-        match row with
-        | Some row ->
-            try
-                m.stats <- { (row |> parseRow) with cr = toCr m.cr } |> Some
-                save()
-                printfn "%s OK" m.name
-            with _ -> printfn "Could not parse '%s' (%s)" m.name m.source
-        | None ->
-            printfn "supplyStats (\"%s\", achpstrdexconintwischa, [], \"30 ft.\", [], [], []) // %s" m.name m.source
-        //
-
-// remove monsters that aren't real monsters deserving of a separate entry
-save()
 
 type SavingThrow = Str of int | Dex of int | Con of int | Int of int | Wis of int | Cha of int | MR | Advantage of string | Legendary of int
 type Condition = Blinded | Charmed | Exhaustion | Frightened | Poisoned | Prone | Restrained | Deafened | Paralyzed | Unconscious | Petrified | Stunned | Grappled | Incapacitated
@@ -420,6 +400,24 @@ supplyStats ("Magewright", 11, 9, 11, 13, 10, 14, 14, 12, [], "30 ft.", [Arcana,
 supplyStats ("Shifter", 14, 19, 12, 16, 14, 11, 15, 10, [], "30 ft.", [Acrobatics, 5; Insight, 4; Nature, 2; Perception, 4], [], []) // Eberron - Rising from the Last War: 319
 supplyStats ("Tarkanan Assassin", 15, 45, 12, 16, 14, 10, 14, 11, [], "30 ft.", [Athletics, 3; Deception, 2; Perception, 4; Sleight, 5; Stealth, 5], [], [Con 12]) // Eberron - Rising from the Last War: 320
 supplyStats ("Warforged Soldier", 16, 30, 16, 12, 16, 10, 14, 11, [Advantage "poison"], "30 ft.", [Athletics, 5; Perception, 4; Survival, 4], [], []) // Eberron - Rising from the Last War: 320
+
+for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
+    if m.stats.IsNone then
+        currentRow <- m
+        let row = match annotations.TryFind(m.name) with
+                    | Some row -> Some row
+                    | None ->
+                        annotations |> Seq.tryPick (fun (KeyValue(name, data)) -> if name.StartsWith(Regex.Replace(m.name, " \((in lair|coven)\)", ""), System.StringComparison.InvariantCultureIgnoreCase) then Some data else None)
+        match row with
+        | Some row ->
+            try
+                m.stats <- { (row |> parseRow) with cr = toCr m.cr } |> Some
+                save()
+                printfn "%s OK" m.name
+            with _ -> printfn "Could not parse '%s' (%s)" m.name m.source
+        | None ->
+            printfn "supplyStats (\"%s\", achpstrdexconintwischa, [], \"30 ft.\", [], [], []) // %s" m.name m.source
+        //
 
 save()
 
