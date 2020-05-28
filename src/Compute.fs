@@ -62,7 +62,6 @@ let mutable bySrcCR = creatures |> Array.groupBy (fun m -> m.sourcebook, m.cr) |
 let initialize input =
     creatures <- input
     byName <- creatures |> Seq.map (fun m -> m.name, m) |> Map.ofSeq
-    byName <- creatures |> Seq.map (fun m -> m.name, m) |> Map.ofSeq
     byCR <- creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
     bySrcCR <- creatures |> Array.groupBy (fun m -> m.sourcebook, m.cr) |> Map.ofSeq
     creatureTypes <- creatures |> Seq.map (fun m -> m.creatureType) |> Seq.distinct |> Seq.filter (not << System.String.IsNullOrWhiteSpace) |> Array.ofSeq

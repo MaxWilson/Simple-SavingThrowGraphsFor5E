@@ -303,10 +303,13 @@ module Graph =
                     let modifier =
                         match defense with
                         | Save | NonmagicalSave ->
+                            let lr = match m.stats.legendaryResistance with
+                                     | Some n -> sprintf ", LR %d/Day" n
+                                     | None -> ""
                             if hasAdvantage defense ability m then
-                                sprintf "(%+i, advantage)" (abilityOf m ability |> save)
+                                sprintf "(%+i, advantage%s)" (abilityOf m ability |> save) lr
                             else
-                                sprintf "(%+i)" (abilityOf m ability |> save)
+                                sprintf "(%+i%s)" (abilityOf m ability |> save) lr
                         | Check ->
                             sprintf "(%+i)" (abilityOf m ability |> stat)
                     if number = 1 then sprintf "%s %s" m.name modifier

@@ -362,8 +362,8 @@ supplyStats ("Giant Skeleton", 17, 115, 21, 10, 20, 4, 6, 6, [], "30 ft.", [], [
 supplyStats ("Thayan Apprentice", 12, 27, 10, 14, 12, 15, 13, 11, [], "30 ft.", [Arcana, 4], [], []) // Tales from the Yawning Portal: 245
 supplyStats ("Acererak", 21, 285, 13, 16, 20, 27, 21, 20, [Con 12; Int 15; Wis 12; Legendary 3], "30 ft.", [Arcana, 22; History, 22; Insight, 12; Perception, 12; Religion, 15], [], [Con 23; Wis 20]) // Tomb of Annihilation: 209
 supplyStats ("Tabaxi Ministrel", 12, 22, 10, 15, 11, 14, 12, 16, [], "30 ft., climb 20 ft.", [Perception, 3; Performance, 7; Persuasion, 5; Stealth, 4], [Resist "cold, lightning"; Immune "necrotic, poison, bludgeoning, piercing, and slashing from nonmagical attacks"; Conditions [Blinded; Charmed; Deafened; Exhaustion; Frightened; Paralyzed; Petrified; Poisoned; Stunned]], []) // Tomb of Annihilation: 233
-supplyStats ("Belashyrra", 19, 304, 24, 21, 20, 25, 22, 23, [Int 14; Wis 13; Cha 13; MR], "40 ft., fly 40 ft. (hover)", [Arcana, 14; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Int 22; Con 22]) // Eberron - Rising from the Last War: 286
-supplyStats ("Dyrrn", 21, 325, 26, 21, 22, 26, 23, 24, [Int 15; Wis 13; Cha 14; MR], "40 ft., fly 40 ft. (hover).", [Arcana, 15; History, 15; Insight, 13; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Con 23; Int 23]) // Eberron - Rising from the Last War: 288
+supplyStats ("Belashyrra", 19, 304, 24, 21, 20, 25, 22, 23, [Int 14; Wis 13; Cha 13; MR; Legendary 3], "40 ft., fly 40 ft. (hover)", [Arcana, 14; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Int 22; Con 22]) // Eberron - Rising from the Last War: 286
+supplyStats ("Dyrrn", 21, 325, 26, 21, 22, 26, 23, 24, [Int 15; Wis 13; Cha 14; MR; Legendary 3], "40 ft., fly 40 ft. (hover).", [Arcana, 15; History, 15; Insight, 13; Perception, 13], [Resist "poison, psychic"; Conditions [Blinded; Charmed; Exhaustion; Frightened; Poisoned; Prone]], [Wis 22; Con 23; Int 23]) // Eberron - Rising from the Last War: 288
 supplyStats ("Clawfoot", 13, 19, 12, 16, 14, 4, 12, 6, [], "40 ft.", [Perception, 3; Stealth, 5], [], []) // Eberron - Rising from the Last War: 289
 supplyStats ("Fastieth", 14, 9, 12, 18, 10, 4, 11, 4, [], "50 ft.", [], [], []) // Eberron - Rising from the Last War: 289
 supplyStats ("Dolgaunt", 16, 33, 14, 18, 12, 13, 14, 11, [], "40 ft.", [Acrobatics, 6; Perception, 4; Stealth, 6], [Conditions [Blinded]], [Con 11]) // Eberron - Rising from the Last War: 290
@@ -418,9 +418,6 @@ for m in allMonsters |> Seq.filter (fun m -> m.stats.IsNone) do
         | None ->
             printfn "supplyStats (\"%s\", achpstrdexconintwischa, [], \"30 ft.\", [], [], []) // %s" m.name m.source
         //
-
-save()
-
 for m in allMonsters |> Seq.filter (fun m -> m.sourcebook = null) do
     let sources = ["Out of the Abyss"; "Princes of the Apocalypse";
         "Hoard of the Dragon Queen"; "Rise of Tiamat"; "Monster Manual";
@@ -432,14 +429,9 @@ for m in allMonsters |> Seq.filter (fun m -> m.sourcebook = null) do
     match sources |> List.tryFind(fun candidate -> m.source.StartsWith candidate) with
     | Some src -> m.sourcebook <- src
     | None -> printfn "Not categorized: %s from %s" m.name m.source
-
 save()
 
 // remove the stupid Tortle stuff
 allMonsters <- allMonsters |> List.filter (fun m -> m.stats.IsSome)
 
-// #r "nuget: Thoth.Json.Net"
-// open Thoth.Json.Net
-// put the data in a format that we can easily parse at runtime (Thoth, not Newtonsoft)
 System.IO.File.WriteAllText(@"c:\code\saves\public\creatures.json", allMonsters |> encode)
-
