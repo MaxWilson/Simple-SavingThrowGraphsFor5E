@@ -539,12 +539,13 @@ let buildEncounter: ConstructEncounter =
                         match creatures.[cr] with
                         | cs when cs.Length > 0 -> cs |> chooseFrom |> Some
                         | _ -> None
-                let rec generateGroupEncounter remainingBudget : Encounter =
+                let rec generateGroupEncounter remainingBudget attempts: Encounter =
                     let candidateCRs = (Xanathar.crs |> Array.filter (fun cr ->
                         match Xanathar.groupRatios lvl cr with
                         | Some(n,m) -> (float n)/(float m) <= remainingBudget
                         | _ -> false))
-                    if candidateCRs.Length = 0 then []
+                    // if there are no eligible monsters, there are no eligible monsters.
+                    if candidateCRs.Length = 0 || attempts > 50 then []
                     else
                         let cr = chooseFrom candidateCRs
                         let (monsterRatio, pcRatio) = Xanathar.groupRatios lvl cr |> Option.get
@@ -556,9 +557,9 @@ let buildEncounter: ConstructEncounter =
                         match creature cr with
                         | Some creature ->
                             let cost = (float numberOfMonsters * float monsterRatio) / (float pcRatio)
-                            (numberOfMonsters, creature)::(generateGroupEncounter (remainingBudget - cost))
+                            (numberOfMonsters, creature)::(generateGroupEncounter (remainingBudget - cost) 1)
                         | None -> // pick something else
-                            (generateGroupEncounter (remainingBudget))
+                            (generateGroupEncounter (remainingBudget) (attempts+1))
                 let rec generateSolo cr : Encounter =
                     match creature (float cr) with
                     | Some creature -> [1, creature]
@@ -568,7 +569,7 @@ let buildEncounter: ConstructEncounter =
                         else []
                 let group =
                     let budget = float settings.partySize * match diff with Easy -> (2./3.) | Medium -> 1.0 | (Hard | _) -> 1.5
-                    fun _ -> generateGroupEncounter budget
+                    fun _ -> generateGroupEncounter budget 1
                 let solo =
                     let soloBudget = Xanathar.soloMax.[lvl]
                     let crMax =
@@ -610,4 +611,3 @@ let buildEncounter: ConstructEncounter =
                 List.init N (fun _ ->
                     DMGish.makeEncounter allowedCreatures calculate xpBounds)
         encounters |> List.distinct // no point in showing duplicates on the graphs
-

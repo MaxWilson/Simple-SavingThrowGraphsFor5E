@@ -175,7 +175,7 @@ module Settings =
                         prop.maxLength 2
                         prop.style [style.maxWidth (length.em 7); style.verticalAlign.middle; style.marginLeft (length.em 2)]
                         prop.placeholder "Party size"
-                        match partySize with Some dc -> prop.value (dc.ToString()) | _ -> ()
+                        match partySize with Some dc -> prop.value (dc.ToString()) | _ -> prop.value ""
                         prop.onChange(fun str ->
                             match System.Int32.TryParse str with
                             | true, n -> dispatch (Choose (PartySize n))
