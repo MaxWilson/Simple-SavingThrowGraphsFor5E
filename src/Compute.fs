@@ -392,6 +392,8 @@ let buildEncounter: ConstructEncounter =
                     if settings.partySize <= 4 then soloBudget.four
                     elif settings.partySize >= 6 then soloBudget.five
                     else soloBudget.five
+                let crMax =
+                    match diff with Easy -> crMax - 3 | Medium -> crMax | (Hard | _) -> crMax + 2
                 fun _ -> generateSolo crMax
             match typ with
             | Group -> List.init N group
