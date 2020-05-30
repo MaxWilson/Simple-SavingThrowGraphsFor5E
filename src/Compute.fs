@@ -401,4 +401,5 @@ let buildEncounter: ConstructEncounter =
             | Mixed -> List.init N (fun x -> (chooseFrom [|solo; group|]) x)
         | DMG diff | ShiningSword diff ->
             failwith "No impl"
+        |> List.distinct
 
