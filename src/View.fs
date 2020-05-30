@@ -31,6 +31,13 @@ let group (bs: (ReactElement * ReactElement) list) =
             radio
             label
         ]
+let groupPlus (bs: (ReactElement * ReactElement) list) extra =
+    Bulma.field.p [
+        for radio, label in bs do
+            yield radio
+            yield label
+        yield! extra
+        ]
 let vgroup (bs: (ReactElement * ReactElement) list) =
     Html.ul [
         for radio, label in bs do
@@ -324,7 +331,7 @@ module Graph =
         | _ ->
             fun label ->
                 sprintf "%s<br>With %d %s level PCs" label settings.partySize (asCardinal lvl)
-    let describeEncounter (ability: Ability) (defense:DefenseMethod) (dc: int) (encounter: Encounter) (nTargets, effectiveness) =
+    let describeEncounter (ability: Ability) (defense:DefenseMethod) (dc: int) tags (encounter: Encounter) (nTargets, effectiveness) =
         let txt =
             System.String.Join(" and ",
                 encounter
@@ -335,7 +342,7 @@ module Graph =
                             let lr = match m.stats.legendaryResistance with
                                      | Some n -> sprintf ", LR %d/Day" n
                                      | None -> ""
-                            if hasAdvantage defense ability m then
+                            if hasAdvantage defense ability tags m then
                                 sprintf "(%+i, advantage%s)" (abilityOf m ability |> save) lr
                             else
                                 sprintf "(%+i%s)" (abilityOf m ability |> save) lr
@@ -390,8 +397,8 @@ module Graph =
                 // in this case we're going to ignore best/worst and just plot ALL the marks
                 let evaluateEncounter lvl encounter =
                     let dc = (Compute.dcOf model.evalSettings.dcComputer lvl)
-                    let (nTargets, effectiveness) = Compute.calculateEffectiveness lr resp.attack resp.ability dc encounter
-                    let label = describeEncounter resp.ability defense dc encounter (nTargets, effectiveness)
+                    let (nTargets, effectiveness) = Compute.calculateEffectiveness lr (resp.attack, model.focusTags) resp.ability dc encounter
+                    let label = describeEncounter resp.ability defense dc model.focusTags encounter (nTargets, effectiveness)
                     {| x = lvl; y = effectiveness; label = label |}
                 let addPrefix = addPrefix model.constructSettings
                 let marks = data |> List.collect(fun { pcLevel = lvl; average = Result(_, encounters) } -> encounters |> List.map (evaluateEncounter lvl))
@@ -456,7 +463,7 @@ module Graph =
                         scatter.x xs
                         scatter.y ys
                         scatter.marker (marks |> List.map (fun _ -> marker.color myColor))
-                        scatter.text (marks |> List.map (fun (lvl, Result(effectiveness, encounters)) -> describeEncounter resp.ability defense (dcOf lvl) (encounters |> List.exactlyOne) (None, effectiveness) |> addPrefix model.constructSettings (int lvl)))
+                        scatter.text (marks |> List.map (fun (lvl, Result(effectiveness, encounters)) -> describeEncounter resp.ability defense (dcOf lvl) model.focusTags (encounters |> List.exactlyOne) (None, effectiveness) |> addPrefix model.constructSettings (int lvl)))
                         scatter.hoverinfo.text
                         scatter.showlegend false
                         scatter.hoveron.points
@@ -571,11 +578,37 @@ let view (model: Model) dispatch =
                             | None ->
                                 Graph.overview model graph dispatch
                             Bulma.dropdownDivider[]
-                            group [
+                            groupPlus [
                                 radioOf dispatch "overview" "Overview" (model.focus = None) (SetFocus None)
                                 for a in [Str; Dex; Con; Int; Wis; Cha] do
                                     let name = a.ToString()
                                     radioOf dispatch name name (model.focus = Some a) (SetFocus <| Some a)
+                                ] [
+                                if model.focus.IsSome then
+                                    Bulma.button.button [prop.text "Effect tags"; prop.onClick (fun _ -> dispatch ToggleQuickView)]
+                                    Html.span [prop.text (System.String.Join(",", model.focusTags))]
+                                ]
+                            QuickView.quickview [
+                                if model.showQuickview then quickview.isActive
+                                prop.children [
+                                    QuickView.header [
+                                        Html.div "Effect tags"
+                                        Bulma.delete [ prop.onClick (fun _ -> ToggleQuickView |> dispatch) ]
+                                    ]
+                                    QuickView.body [
+                                        let tagChoice = model.focusTags
+                                        vgroup [
+                                            for tag in Compute.attackTags do
+                                                smallCheckboxOf dispatch ("chktag" + tag.Replace(" ", "")) tag (tagChoice |> List.contains tag) (SetFocusTags (toggle tagChoice tag))
+                                            ]
+                                        ]
+                                    QuickView.footer [
+                                        Bulma.button.button [
+                                            prop.text "OK"
+                                            prop.onClick (fun _ -> dispatch ToggleQuickView)
+                                            ]
+                                        ]
+                                    ]
                                 ]
                             Bulma.button.button [
                                 prop.onClick (fun _ -> dispatch Reset)

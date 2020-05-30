@@ -21,6 +21,7 @@ let fresh =
     analysis = NotStarted
     focus = None
     showQuickview = false
+    focusTags = []
     }
 let init _ =
     fresh, Cmd.Empty
@@ -61,3 +62,4 @@ let update msg model =
         { model with constructSettings = c; evalSettings = e }, Cmd.Empty
     | SetFocus ab -> { model with focus = ab }, Cmd.Empty
     | ToggleQuickView -> { model with showQuickview = not model.showQuickview }, Cmd.Empty
+    | SetFocusTags tags -> { model with focusTags = tags }, Cmd.Empty

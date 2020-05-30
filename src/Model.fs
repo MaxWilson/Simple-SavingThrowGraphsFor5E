@@ -33,6 +33,7 @@ type Model = {
     creatures: Deferred<Result<Header array, string>>
     analysis: Deferred<Result<Graph, string>>
     focus: Ability option
+    focusTags: string list
     showQuickview: bool
     }
 
@@ -44,3 +45,4 @@ type Msg =
     | Reset
     | SetFocus of Ability option
     | ToggleQuickView
+    | SetFocusTags of string list

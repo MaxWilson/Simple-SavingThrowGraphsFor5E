@@ -61,13 +61,11 @@ let attackTags = [|
     //"bludgeoning, piercing, and slashing from nonmagical attacks that aren't adamantine";
     //"bludgeoning, piercing, and slashing from nonmagical weapons";
     //"bludgeoning, piercing, and slashing from nonmagical/nonsilver weapons";
-    "acid"; "blinded"; "charmed"; "cold"; "deafened";
-    "exhaustion"; "fire"; "frightened"; "grappled"; "lightning"; "necrotic";
-    "paralyzed"; "petrified"; "poison"; "poisoned"; "prone";
-    "psychic"; "restrained"; "stunned"; "thunder"; "unconscious";
+    "save for half";
     "acid"; "blinded"; "charmed"; "cold"; "deafened"; "exhaustion"; "fire";
-    "frightened"; "grappled"; "paralyzed"; "petrified"; "poison"; "poisoned";
-    "prone"; "restrained"; "stunned"; "unconscious"|]
+    "frightened"; "grappled"; "lightning"; "necrotic"; "paralyzed";
+    "petrified"; "poison"; "poisoned"; "prone"; "psychic"; "restrained";
+    "save for half"; "stunned"; "thunder"; "unconscious"|]
 let mutable creatureTypes = [||]
 let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 1. .. 30.]
 let mutable byCR = creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
@@ -175,7 +173,7 @@ let abilityOf m = function
     | Int -> m.stats.int
     | Wis -> m.stats.wis
     | Cha -> m.stats.cha
-let hasAdvantage (defense:DefenseMethod) (ability: Ability) (m: Header) =
+let hasAdvantage (defense:DefenseMethod) (ability: Ability) tags (m: Header) =
     if m.stats.advantage = null then (defense = Save && m.stats.magicResistance)
     else
         let adv txt = m.stats.advantage.ToLowerInvariant().Contains(txt)
@@ -187,28 +185,42 @@ let hasAdvantage (defense:DefenseMethod) (ability: Ability) (m: Header) =
             | Wis -> adv "wisdom"
             | Cha -> adv "charisma")
         || (defense = Save && m.stats.magicResistance)
+        || tags |> List.exists (fun tag -> m.stats.advantage.Contains tag)
 
-let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : int option * float =
+let calculateEffectiveness scaleByLR (a: Attack, tags: string list)(ability: Ability) (dc: int) (encounter: Encounter) : int option * float =
     let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
-    let effectivenessOfDefense (m: Header) defense =
-        let success bonus dc =
-            min 1. (max 0. (float (dc - bonus) / 20.))
-        let sq v = v * v
-        match defense with
-        | Save | NonmagicalSave ->
-            let baseRate = (success (abilityOf m ability |> save) dc)
-            let effectiveness = if hasAdvantage defense ability m then sq baseRate else baseRate
-            if scaleByLR = false then effectiveness
-            else
-                match m.stats.legendaryResistance with
-                | Some n -> (effectiveness / (float n + 1.))
-                | None -> effectiveness
-        | Check -> success (abilityOf m ability |> stat) dc
+    let exists = System.String.IsNullOrWhiteSpace >> not
+    let effectivenessOfAttack (m: Header) defense =
+        if tags |> List.exists(fun tag -> exists m.stats.damageImmunities && m.stats.damageImmunities.Contains tag || m.stats.conditionImmunities <> Unchecked.defaultof<_> && m.stats.conditionImmunities |> List.contains tag) then 0.
+        else
+            let success bonus dc =
+                min 1. (max 0. (float (dc - bonus) / 20.))
+            let sq v = v * v
+            let mutable effectiveness =
+                match defense with
+                | Save | NonmagicalSave ->
+                    let baseRate = (success (abilityOf m ability |> save) dc)
+                    let effectiveness = if hasAdvantage defense ability tags m then sq baseRate else baseRate
+                    if scaleByLR = false then effectiveness
+                    else
+                        match m.stats.legendaryResistance with
+                        | Some n -> (effectiveness / (float n + 1.))
+                        | None -> effectiveness
+                | Check -> success (abilityOf m ability |> stat) dc
+            if tags |> List.exists ((=) "save for half") then
+                // even failures count for half
+                effectiveness <- (1. - effectiveness)/2. + effectiveness
+            // now apply resistances, and vulnerabilities
+            if m.stats.damageResistances |> exists && tags |> List.exists(fun tag -> m.stats.damageResistances.Contains tag) then
+                effectiveness <- effectiveness/2.
+            if m.stats.damageVuln |> exists && tags |> List.exists(fun tag -> m.stats.damageVuln.Contains tag) then
+                effectiveness <- effectiveness * 2.
+            effectiveness
     let numberOfTargets, numberAffected =
         match a with
-        | SingleTarget d -> None, encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max
+        | SingleTarget d -> None, encounter |> List.map(fun (n,m) -> effectivenessOfAttack m d) |> List.max
         | AoE(d, maxTargets, maxPct) ->
-            let enemies = encounter |> List.collect(fun (n,m) -> let e = effectivenessOfDefense m d in List.init n (fun _ -> e))
+            let enemies = encounter |> List.collect(fun (n,m) -> let e = effectivenessOfAttack m d in List.init n (fun _ -> e))
             if enemies.Length = 1 then None, enemies.Head
             else
                 let nTargets = max 1 (min (float enemies.Length * maxPct/100. |> int) maxTargets) // it should never drop to zero
@@ -261,12 +273,12 @@ let eval: Evaluate = fun construct constructSettings evalSettings ->
 
                     let encounters = encountersByLevel.[level]
                     let by f =
-                            let calc e = (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc e)
+                            let calc e = (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance (attack,[]) ability dc e)
                             let e = encounters |> f (calc >> snd)
                             in Result(calc e |> snd, [e])
                     if not encounters.IsEmpty then {
                         pcLevel = level
-                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc >> snd), encounters)
+                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance (attack,[]) ability dc >> snd), encounters)
                         best = by Seq.maxBy
                         worst = by Seq.minBy
                         }
