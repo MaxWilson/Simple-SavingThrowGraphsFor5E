@@ -55,6 +55,19 @@ let sources = [|"Out of the Abyss"; "Princes of the Apocalypse";
     "Storm King's Thunder"; "Curse of Strahd"; "Tales from the Yawning Portal";
     "Tomb of Annihilation"; "Volo's Guide to Monsters";
     "Eberron - Rising from the Last War"|]
+let attackTags = [|
+    // BPS is mostly irrelevant for spells, omitting
+    //"bludgeoning, piercing, and slashing from nonmagical attacks";
+    //"bludgeoning, piercing, and slashing from nonmagical attacks that aren't adamantine";
+    //"bludgeoning, piercing, and slashing from nonmagical weapons";
+    //"bludgeoning, piercing, and slashing from nonmagical/nonsilver weapons";
+    "acid"; "blinded"; "charmed"; "cold"; "deafened";
+    "exhaustion"; "fire"; "frightened"; "grappled"; "lightning"; "necrotic";
+    "paralyzed"; "petrified"; "poison"; "poisoned"; "prone";
+    "psychic"; "restrained"; "stunned"; "thunder"; "unconscious";
+    "acid"; "blinded"; "charmed"; "cold"; "deafened"; "exhaustion"; "fire";
+    "frightened"; "grappled"; "paralyzed"; "petrified"; "poison"; "poisoned";
+    "prone"; "restrained"; "stunned"; "unconscious"|]
 let mutable creatureTypes = [||]
 let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 1. .. 30.]
 let mutable byCR = creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
@@ -175,7 +188,7 @@ let hasAdvantage (defense:DefenseMethod) (ability: Ability) (m: Header) =
             | Cha -> adv "charisma")
         || (defense = Save && m.stats.magicResistance)
 
-let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : int * float =
+let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : int option * float =
     let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
     let effectivenessOfDefense (m: Header) defense =
         let success bonus dc =
@@ -193,16 +206,16 @@ let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (e
         | Check -> success (abilityOf m ability |> stat) dc
     let numberOfTargets, numberAffected =
         match a with
-        | SingleTarget d -> 1, encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max
+        | SingleTarget d -> None, encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max
         | AoE(d, maxTargets, maxPct) ->
             let enemies = encounter |> List.collect(fun (n,m) -> let e = effectivenessOfDefense m d in List.init n (fun _ -> e))
-            if enemies.Length <= 1 then 1, enemies.Head
+            if enemies.Length = 1 then None, enemies.Head
             else
-                let nTargets = min (float enemies.Length * maxPct/100. |> int) maxTargets
+                let nTargets = max 1 (min (float enemies.Length * maxPct/100. |> int) maxTargets) // it should never drop to zero
                 let successCount =
                     enemies |> List.sortDescending |> List.take nTargets
                     |> List.sum
-                nTargets, successCount
+                Some nTargets, successCount
     let effectiveness = numberAffected / (float numberOfMonsters) * 100.
     numberOfTargets, effectiveness
 
@@ -340,66 +353,249 @@ module Xanathar =
         |> List.mapi (fun ix (six, five, four) -> (ix+1), {| six = six; five = five; four = four |})
         |> Map.ofSeq
 
+module DMGish =
+    open System.Math
+    type Advancement = { level: int; XPReq: int; proficiencyBonus: int }
+    let levelAdvancement =
+        [|
+        // Level, XP required, proficiency bonus
+        1, 0, +2
+        2, 300, +2
+        3, 900, +2
+        4, 2700, +2
+        5, 6500, +3
+        6, 14000, +3
+        7, 23000, +3
+        8, 34000, +3
+        9, 48000, +4
+        10, 64000, +4
+        11, 85000, +4
+        12, 100000, +4
+        13, 120000, +5
+        14, 140000, +5
+        15, 165000, +5
+        16, 195000, +5
+        17, 225000, +6
+        18, 265000, +6
+        19, 305000, +6
+        20, 355000, +6
+        |] |> Array.map (fun (level, xpReq, proficiencyBonus) -> { level = level; XPReq = xpReq; proficiencyBonus = proficiencyBonus })
+
+    type XPBudget = { level: int; easy: int; medium: int; hard: int; deadly: int; daily: int }
+    let xpBudgets =
+        [|
+        // Level, easy, medium, hard, deadly, daily
+        1, 25, 50, 75, 100, 300
+        2, 50, 100, 150, 200, 600
+        3, 75, 150, 225, 400, 1200
+        4, 125, 250, 375, 500, 1700
+        5, 250, 500, 750, 1100, 3500
+        6, 300, 600, 900, 1400, 4000
+        7, 350, 750, 1100, 1700, 5000
+        8, 450, 900, 1400, 2100, 6000
+        9, 550, 1100, 1600, 2400, 7500
+        10, 600, 1200, 1900, 2800, 9000
+        11, 800, 1600, 2400, 3600, 10500
+        12, 1000, 2000, 3000, 4500, 11500
+        13, 1100, 2200, 3400, 5100, 13500
+        14, 1250, 2500, 3800, 5700, 15000
+        15, 1400, 2800, 4300, 6400, 18000
+        16, 1600, 3200, 4800, 7200, 20000
+        17, 2000, 3900, 5900, 8800, 25000
+        18, 2100, 4200, 6300, 9500, 27000
+        19, 2400, 4900, 7300, 10900, 30000
+        20, 2800, 5700, 8500, 12700, 40000
+        |] |> Array.map (fun (level, easy, medium, hard, deadly, daily) -> { level = level; easy = easy; medium = medium; hard = hard; deadly = deadly; daily = daily})
+    type MonsterCR = { CR: float; XPReward: int }
+    let monsterCR =
+        [|
+        // CR, XP
+        0., 10
+        0.125, 25
+        0.25, 50
+        0.5, 100
+        1., 200
+        2., 450
+        3., 700
+        4., 1100
+        5., 1800
+        6., 2300
+        7., 2900
+        8., 3900
+        9., 5000
+        10., 5900
+        11., 7200
+        12., 8400
+        13., 10000
+        14., 11500
+        15., 13000
+        16., 15000
+        17., 18000
+        18., 20000
+        19., 22000
+        20., 25000
+        21., 33000
+        22., 41000
+        23., 50000
+        24., 62000
+        25., 75000
+        26., 90000
+        27., 105000
+        28., 120000
+        29., 135000
+        30., 155000
+        |] |> Array.map (fun (cr, xp) -> { CR = cr; XPReward = xp })
+    let xpValue =
+        let xps = monsterCR |> Array.map(fun { CR = cr; XPReward = xp } -> cr, xp) |> Map.ofArray
+        fun cr -> xps.[cr]
+
+    let sscalculate (monsters: Header seq) =
+        let costs = monsters |> Seq.map (fun m -> Pow((xpValue m.cr |> float) / 100., (2./3.)))
+        (Pow(Seq.sum costs, 1.5) * 100. |> Round |> int)
+    let dmgcalculate partySize (monsters: Header seq) =
+        let costs = monsters |> Seq.sumBy (fun m -> xpValue m.cr)
+        let mult =
+            let mults = [0.5; 1.; 1.5; 2.; 2.5; 3.; 4.; 5.]
+            let ix =
+                match monsters |> Seq.length with
+                | 1 -> 1
+                | 2 -> 2
+                | n when n <= 6 -> 3
+                | n when n <= 10 -> 4
+                | n when n <= 14 -> 5
+                | _ -> 6
+            match partySize with
+            | n when n < 3 -> mults.[ix+1]
+            | n when n <= 6 -> mults.[ix]
+            | _ -> mults.[ix-1]
+        (float costs) * mult |> Round |> int
+
+    let makeEncounter allowedCreatures calculate (xpMin: int, xpMax: int) : Encounter =
+        let newTemplate() =
+            // pick two or three types of creatures from allowedCreatures
+            if r.Next(100) <= 50 then
+                Array.init 3 (fun _ -> chooseFrom allowedCreatures)
+            else
+                Array.init 2 (fun _ -> chooseFrom allowedCreatures)
+        let rec generate template =
+            let rec addMonster monsters =
+                let precost = calculate monsters
+                let monster = chooseFrom template
+                let monsters' = monster::monsters
+                let postcost = calculate monsters'
+                if postcost <= xpMax then
+                    addMonster monsters' // keep going!
+                else
+                    if postcost > xpMax && precost < xpMin then
+                        // it's too cheap before and too expensive after, no legal way to use this candidate
+                        // send signal to start over with a new template instead
+                        []
+                    elif precost >= xpMin then
+                        monsters
+                    else
+                        // too expensive
+                        []
+            match addMonster [] with
+            | [] ->
+                generate(newTemplate()) // this template was too tough to allow even one monster--choose a different template
+            | candidate ->
+                // in order to avoid bias towards barely-difficult-enough encounters,
+                // we'll make the probability of accepting a candidate proportional to how much of the (max-min) range it occupies
+                let cost = calculate candidate
+                let range = xpMax - xpMin
+                let fraction = float (cost - xpMin) / float range
+                if r.NextDouble() <= fraction then candidate
+                else generate(newTemplate())
+        let toEncounter (monsters: Header list) : Encounter =
+            monsters |> List.groupBy id |> List.map(fun (m, lst) -> List.length lst, m)
+        generate(newTemplate()) |> toEncounter
+
 let buildEncounter: ConstructEncounter =
     fun settings lvl N ->
-        match settings.method with
-        | PureCR -> constructPureCR settings lvl N
-        | Xanathar(typ, diff) ->
-            let lvl = int lvl
-            let creature =
-                let creatures = byCR |> Map.map(fun lvl creatures ->
+        let encounters =
+            match settings.method with
+            | PureCR -> constructPureCR settings lvl N
+            | Xanathar(typ, diff) ->
+                let lvl = int lvl
+                let creature =
+                    let creatures = byCR |> Map.map(fun lvl creatures ->
+                        creatures |> Array.filter (fun (m:Header) ->
+                            settings.sources |> List.exists((=) m.sourcebook)
+                            && (settings.creatureType.IsEmpty
+                                || settings.creatureType |> List.exists((=)m.creatureType))))
+                    fun cr ->
+                        match creatures.[cr] with
+                        | cs when cs.Length > 0 -> cs |> chooseFrom |> Some
+                        | _ -> None
+                let rec generateGroupEncounter remainingBudget : Encounter =
+                    let candidateCRs = (Xanathar.crs |> Array.filter (fun cr ->
+                        match Xanathar.groupRatios lvl cr with
+                        | Some(n,m) -> (float n)/(float m) <= remainingBudget
+                        | _ -> false))
+                    if candidateCRs.Length = 0 then []
+                    else
+                        let cr = chooseFrom candidateCRs
+                        let (monsterRatio, pcRatio) = Xanathar.groupRatios lvl cr |> Option.get
+                        let maxMonsters = remainingBudget * (float pcRatio) / (float monsterRatio) |> System.Math.Round |> int
+                        let numberOfMonsters =
+                            match r.Next 100 with
+                            | n when n <= 50 -> maxMonsters
+                            | _ -> 1 + r.Next(maxMonsters)
+                        match creature cr with
+                        | Some creature ->
+                            let cost = (float numberOfMonsters * float monsterRatio) / (float pcRatio)
+                            (numberOfMonsters, creature)::(generateGroupEncounter (remainingBudget - cost))
+                        | None -> // pick something else
+                            (generateGroupEncounter (remainingBudget))
+                let rec generateSolo cr : Encounter =
+                    match creature (float cr) with
+                    | Some creature -> [1, creature]
+                    | None -> // no solo creatures at this level, try next lower
+                        if(cr - 1) > 0 then
+                            generateSolo (cr - 1)
+                        else []
+                let group =
+                    let budget = float settings.partySize * match diff with Easy -> (2./3.) | Medium -> 1.0 | (Hard | _) -> 1.5
+                    fun _ -> generateGroupEncounter budget
+                let solo =
+                    let soloBudget = Xanathar.soloMax.[lvl]
+                    let crMax =
+                        if settings.partySize <= 4 then soloBudget.four
+                        elif settings.partySize >= 6 then soloBudget.five
+                        else soloBudget.five
+                    let crMax =
+                        match diff with Easy -> crMax - 3 | Medium -> crMax | (Hard | _) -> crMax + 2
+                    fun _ -> generateSolo crMax
+                match typ with
+                | Group -> List.init N group
+                | Solo -> List.init N solo
+                | Mixed -> List.init N (fun x -> (chooseFrom [|solo; group|]) x)
+            | DMG diff | ShiningSword diff ->
+                let allowedCreatures =
                     creatures |> Array.filter (fun (m:Header) ->
                         settings.sources |> List.exists((=) m.sourcebook)
                         && (settings.creatureType.IsEmpty
-                            || settings.creatureType |> List.exists((=)m.creatureType))))
-                fun cr ->
-                    match creatures.[cr] with
-                    | cs when cs.Length > 0 -> cs |> chooseFrom |> Some
-                    | _ -> None
-            let rec generateGroupEncounter remainingBudget : Encounter =
-                let candidateCRs = (Xanathar.crs |> Array.filter (fun cr ->
-                    match Xanathar.groupRatios lvl cr with
-                    | Some(n,m) -> (float n)/(float m) <= remainingBudget
-                    | _ -> false))
-                if candidateCRs.Length = 0 then []
-                else
-                    let cr = chooseFrom candidateCRs
-                    let (monsterRatio, pcRatio) = Xanathar.groupRatios lvl cr |> Option.get
-                    let maxMonsters = remainingBudget * (float pcRatio) / (float monsterRatio) |> System.Math.Round |> int
-                    let numberOfMonsters =
-                        match r.Next 100 with
-                        | n when n <= 50 -> maxMonsters
-                        | _ -> 1 + r.Next(maxMonsters)
-                    match creature cr with
-                    | Some creature ->
-                        let cost = (float numberOfMonsters * float monsterRatio) / (float pcRatio)
-                        (numberOfMonsters, creature)::(generateGroupEncounter (remainingBudget - cost))
-                    | None -> // pick something else
-                        (generateGroupEncounter (remainingBudget))
-            let rec generateSolo cr : Encounter =
-                match creature (float cr) with
-                | Some creature -> [1, creature]
-                | None -> // no solo creatures at this level, try next lower
-                    if(cr - 1) > 0 then
-                        generateSolo (cr - 1)
-                    else []
-            let group =
-                let budget = float settings.partySize * match diff with Easy -> (2./3.) | Medium -> 1.0 | (Hard | _) -> 1.5
-                fun _ -> generateGroupEncounter budget
-            let solo =
-                let soloBudget = Xanathar.soloMax.[lvl]
-                let crMax =
-                    if settings.partySize <= 4 then soloBudget.four
-                    elif settings.partySize >= 6 then soloBudget.five
-                    else soloBudget.five
-                let crMax =
-                    match diff with Easy -> crMax - 3 | Medium -> crMax | (Hard | _) -> crMax + 2
-                fun _ -> generateSolo crMax
-            match typ with
-            | Group -> List.init N group
-            | Solo -> List.init N solo
-            | Mixed -> List.init N (fun x -> (chooseFrom [|solo; group|]) x)
-        | DMG diff | ShiningSword diff ->
-            failwith "No impl"
-        |> List.distinct
+                            || settings.creatureType |> List.exists((=)m.creatureType)))
+                let lvlStats = DMGish.xpBudgets |> Array.find (fun d -> d.level = int lvl)
+                let xpBounds =
+                    let (xpMin, xpMax) =
+                        match diff with
+                        | Easy -> lvlStats.easy, lvlStats.medium - 1
+                        | Medium -> lvlStats.medium, lvlStats.hard - 1
+                        | Hard -> lvlStats.hard, lvlStats.deadly - 1
+                        | Deadly -> lvlStats.deadly, (lvlStats.deadly * 3) / 2
+                        | Ludicrous -> lvlStats.deadly * 2, lvlStats.deadly * 6
+                    let (xpMin, xpMax) = settings.partySize * xpMin, settings.partySize * xpMax
+                    match settings.method with
+                    | ShiningSword _ when settings.partySize <> 4->
+                        // Shining Sword scales both PC Power and monster power as the 3/2 power of size
+                        // Shining Sword has no XP multiplier like DMG does, so we apply scaling directly to bounds,
+                        // treating 4 PCs are the standard case
+                        let scalingFactor = System.Math.Pow(float settings.partySize / 4., 2./3.)
+                        (float xpMin * scalingFactor |> int), (float xpMax * scalingFactor |> int)
+                    | _ -> (xpMin, xpMax)
+                let calculate = match settings.method with DMG _ -> DMGish.dmgcalculate settings.partySize | _ -> DMGish.sscalculate
+                List.init N (fun _ ->
+                    DMGish.makeEncounter allowedCreatures calculate xpBounds)
+        encounters |> List.distinct // no point in showing duplicates on the graphs
 

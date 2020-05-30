@@ -111,7 +111,7 @@ module Settings =
         | _ -> None
 
     let view (model: Model) dispatch =
-        Bulma.section [
+        React.fragment [
             let radioOfBase (id:string) child (isChecked: bool) msg = radioOfBase dispatch (id:string) child (isChecked: bool) (Choose msg)
             let radioOf (id:string) txt (isChecked: bool) msg = radioOf dispatch (id:string) txt (isChecked: bool) (Choose msg)
             let checkboxOf (id:string) txt (isChecked: bool) msg = checkboxOf dispatch (id:string) txt (isChecked: bool) (Choose msg)
@@ -139,7 +139,7 @@ module Settings =
                 group [
                     radioOf "xanathar" "Xanathar's method" (methodChoice = Some Xanathar) (EncounterMethod Xanathar)
                     radioOf "dmg" "DMG method" (methodChoice = Some DMG) (EncounterMethod DMG)
-                    radioOf "shiningSword" "ShiningSword method (modified DMG)" (methodChoice = Some ShiningSword) (EncounterMethod ShiningSword)
+                    radioOf "shiningSword" "ShiningSword method (modified DMG for better balance with mixed monster types)" (methodChoice = Some ShiningSword) (EncounterMethod ShiningSword)
                     ]
                 let xanatharChoice = model.choices |> List.tryPick((function XanatharStyle(v) -> Some (v) | _ -> None))
                 if methodChoice = Some Xanathar then
@@ -158,6 +158,7 @@ module Settings =
                         radioOf "hard" "Hard" (difficultyChoice = Some Hard) (Difficulty Hard)
                         if methodChoice.Value <> Xanathar then
                             radioOf "deadly" "Deadly" (difficultyChoice = Some Deadly) (Difficulty Deadly)
+                            radioOf "ludicrous" "Ludicrous (Deadly x2 to x6)" (difficultyChoice = Some Ludicrous) (Difficulty Ludicrous)
                         ]
 
                     Bulma.dropdownDivider []
@@ -187,7 +188,7 @@ module Settings =
                                 Bulma.input.number [
                                     prop.maxLength 4
                                     prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
-                                    prop.placeholder "50%"
+                                    prop.placeholder "40%"
                                     prop.value (maxPct.ToString())
                                     prop.onChange(fun str ->
                                         match System.Double.TryParse str with
@@ -213,7 +214,7 @@ module Settings =
                     Bulma.field.div [
                         let bs = [
                             radioOf "singleTarget" "Single Target" (match targetingChoice with Some(Single(_)) -> true | _ -> false) (TargetingChoice Single)
-                            radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8, 50.)))
+                            radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(20, 40.)))
                             ]
                         for radio, label in bs do
                             radio
@@ -343,10 +344,10 @@ module Graph =
                     if number = 1 then sprintf "%s %s" m.name modifier
                     else sprintf "%d %ss %s" number m.name modifier))
         match nTargets with
-        | None | Some 1 ->
+        | None ->
             sprintf "DC %d %A %s vs. %s: %.1f%% effective" dc ability (if defense = Check then "check" else "save") txt effectiveness
         | Some nTargets ->
-            sprintf "DC %d %A %s vs. %s: %d-target AoE is %.1f%% effective" dc ability (if defense = Check then "check" else "save") txt nTargets effectiveness
+            sprintf "DC %d %A %s vs. %s: AoE hits %d targets and is %.1f%% effective overall" dc ability (if defense = Check then "check" else "save") txt nTargets effectiveness
     let myplot model traces =
         Plotly.plot [
             plot.style [style.margin 20]
@@ -390,7 +391,7 @@ module Graph =
                 let evaluateEncounter lvl encounter =
                     let dc = (Compute.dcOf model.evalSettings.dcComputer lvl)
                     let (nTargets, effectiveness) = Compute.calculateEffectiveness lr resp.attack resp.ability dc encounter
-                    let label = describeEncounter resp.ability defense dc encounter (Some nTargets, effectiveness)
+                    let label = describeEncounter resp.ability defense dc encounter (nTargets, effectiveness)
                     {| x = lvl; y = effectiveness; label = label |}
                 let addPrefix = addPrefix model.constructSettings
                 let marks = data |> List.collect(fun { pcLevel = lvl; average = Result(_, encounters) } -> encounters |> List.map (evaluateEncounter lvl))
@@ -522,7 +523,7 @@ let view (model: Model) dispatch =
                 | Resolved (Ok creatures) ->
                     match model.analysis with
                     | NotStarted ->
-                        Bulma.section [
+                        React.fragment [
                             Settings.view model dispatch
                             QuickView.quickview [
                                 if model.showQuickview then quickview.isActive
