@@ -65,7 +65,7 @@ let attackTags = [|
     "acid"; "blinded"; "charmed"; "cold"; "deafened"; "exhaustion"; "fire";
     "frightened"; "grappled"; "lightning"; "necrotic"; "paralyzed";
     "petrified"; "poison"; "poisoned"; "prone"; "psychic"; "restrained";
-    "save for half"; "stunned"; "thunder"; "unconscious"|]
+    "stunned"; "thunder"; "unconscious"|]
 let mutable creatureTypes = [||]
 let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 1. .. 30.]
 let mutable byCR = creatures |> Array.groupBy (fun m -> m.cr) |> Map.ofSeq
