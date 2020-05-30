@@ -56,11 +56,16 @@ module Settings =
         let (|DcChoice|_|) choices = choices |> List.tryPick((function ChooseDC(v) -> Some (v) | _ -> None))
         let (|PartySize|_|) choices = choices |> List.tryPick((function PartySize(v) -> Some (v) | _ -> None))
         let (|TargetingChoice|_|) = List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
+        let (|XanatharStyleChoice|_|) = List.tryPick((function XanatharStyle(v) -> Some (v) | _ -> None))
         let (|Method|_|) = function
             | AnalysisChoice PureCR -> Some Compute.PureCR
             | AnalysisChoice Encounter & MethodChoice(method) & DifficultyChoice(diff) ->
                 match method, diff with
-                | Xanathar, (Easy | Medium | Hard as diff) -> Some <| Compute.Xanathar(Mixed, diff)
+                | Xanathar, (Easy | Medium | Hard as diff) ->
+                    match choices with
+                    | XanatharStyleChoice style ->
+                        Some <| Compute.Xanathar(style, diff)
+                    | _ -> None
                 | DMG, diff -> Compute.DMG diff |> Some
                 | ShiningSword, diff -> Compute.ShiningSword diff |> Some
                 | _ -> None
@@ -69,7 +74,7 @@ module Settings =
         let (|LR|_|) = function LRChoice(v) -> Some v | DefenseChoices [Check] -> Some false | _ -> None
         let (|DC|_|) = function DcChoice(Fixed(Some n)) -> Compute.Fixed n |> Some | DcChoice Dynamic -> Some Compute.Dynamic | _ -> None
         let (|AttackTypes|_|) = function
-            | DefenseChoices(def) & (TargetingChoice(Single) | AnalysisChoice PureCR) -> Some(def |> List.map SingleTarget)
+            | DefenseChoices(def) & (TargetingChoice(Single) | AnalysisChoice PureCR | Method (Compute.Xanathar(Solo, _))) -> Some(def |> List.map SingleTarget)
             | DefenseChoices(def) & TargetingChoice(AoE(maxTargets, maxPct)) -> Some(def |> List.map (fun d -> Compute.AoE(d, maxTargets, maxPct)))
             | _ -> None
         let sources = choices |> List.tryPick((function SourceFilter(v) -> Some (v) | _ -> None)) |> (function None | Some [] -> (Compute.sources |> List.ofArray) | Some src -> src)
@@ -136,10 +141,16 @@ module Settings =
                     radioOf "dmg" "DMG method" (methodChoice = Some DMG) (EncounterMethod DMG)
                     radioOf "shiningSword" "ShiningSword method (modified DMG)" (methodChoice = Some ShiningSword) (EncounterMethod ShiningSword)
                     ]
+                let xanatharChoice = model.choices |> List.tryPick((function XanatharStyle(v) -> Some (v) | _ -> None))
+                if methodChoice = Some Xanathar then
+                    group [
+                        radioOf "groups" "Groups of monsters" (xanatharChoice = Some Group) (XanatharStyle Group)
+                        radioOf "solos" "Solo monsters" (xanatharChoice = Some Solo) (XanatharStyle Solo)
+                        radioOf "mixed" "Equal mix of both" (xanatharChoice = Some Mixed) (XanatharStyle Mixed)
+                        ]
 
                 if methodChoice.IsSome then
                     let difficultyChoice = model.choices |> List.tryPick((function Difficulty(v) -> Some (v) | _ -> None))
-                    Bulma.dropdownDivider []
                     header "What difficulty?"
                     group [
                         radioOf "easy" "Easy" (difficultyChoice = Some Easy) (Difficulty Easy)
@@ -163,49 +174,51 @@ module Settings =
                             | _ -> ()
                             )
                         ]
-                Bulma.dropdownDivider []
-                header "Can your attack hit more than one target?"
-                let targetingChoice = model.choices |> List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
-                let aoeLabel =
-                    match targetingChoice with
-                    | Some(AoE(maxTargets, maxPct)) ->
-                        Html.span [
-                            header "Area Effect that hits up to"
-                            Bulma.input.number [
-                                prop.maxLength 4
-                                prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
-                                prop.placeholder "50%"
-                                prop.value (maxPct.ToString())
-                                prop.onChange(fun str ->
-                                    match System.Double.TryParse str with
-                                    | true, n -> dispatch (Choose (TargetingChoice (AoE(maxTargets, n))))
-                                    | _ -> ()
-                                    )
+                // AoEs don't matter for Solo-only analysis
+                if methodChoice.IsSome && not (methodChoice = Some Xanathar && (xanatharChoice.IsNone || xanatharChoice = Some Solo)) then
+                    Bulma.dropdownDivider []
+                    header "Can your attack hit more than one target?"
+                    let targetingChoice = model.choices |> List.tryPick((function TargetingChoice(v) -> Some (v) | _ -> None))
+                    let aoeLabel =
+                        match targetingChoice with
+                        | Some(AoE(maxTargets, maxPct)) ->
+                            Html.span [
+                                header "Area Effect that hits up to"
+                                Bulma.input.number [
+                                    prop.maxLength 4
+                                    prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
+                                    prop.placeholder "50%"
+                                    prop.value (maxPct.ToString())
+                                    prop.onChange(fun str ->
+                                        match System.Double.TryParse str with
+                                        | true, n -> dispatch (Choose (TargetingChoice (AoE(maxTargets, n))))
+                                        | _ -> ()
+                                        )
+                                    ]
+                                header "% of enemies, up to a maximum of"
+                                Bulma.input.number [
+                                    prop.maxLength 4
+                                    prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
+                                    prop.placeholder "max number"
+                                    prop.value (maxTargets.ToString())
+                                    prop.onChange(fun str ->
+                                        match System.Int32.TryParse str with
+                                        | true, n -> dispatch (Choose (TargetingChoice (AoE(n, maxPct))))
+                                        | _ -> ()
+                                        )
+                                    ]
                                 ]
-                            header "% of enemies, up to a maximum of"
-                            Bulma.input.number [
-                                prop.maxLength 4
-                                prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
-                                prop.placeholder "max number"
-                                prop.value (maxTargets.ToString())
-                                prop.onChange(fun str ->
-                                    match System.Int32.TryParse str with
-                                    | true, n -> dispatch (Choose (TargetingChoice (AoE(n, maxPct))))
-                                    | _ -> ()
-                                    )
-                                ]
+                        | _ -> Html.text "Area Effect"
+                        |> prop.children
+                    Bulma.field.div [
+                        let bs = [
+                            radioOf "singleTarget" "Single Target" (match targetingChoice with Some(Single(_)) -> true | _ -> false) (TargetingChoice Single)
+                            radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8, 50.)))
                             ]
-                    | _ -> Html.text "Area Effect"
-                    |> prop.children
-                Bulma.field.div [
-                    let bs = [
-                        radioOf "singleTarget" "Single Target" (match targetingChoice with Some(Single(_)) -> true | _ -> false) (TargetingChoice Single)
-                        radioOfBase "aoe" aoeLabel (match targetingChoice with Some(AoE(_)) -> true | _ -> false) (TargetingChoice (AoE(8, 50.)))
+                        for radio, label in bs do
+                            radio
+                            label
                         ]
-                    for radio, label in bs do
-                        radio
-                        label
-                    ]
 
             Bulma.dropdownDivider []
             header "Are you targeting saving throws, ability checks, or both?"
@@ -225,13 +238,20 @@ module Settings =
                     ]
                 header "How would you like to count legendary resistance?"
                 let lrChoice = model.choices |> List.tryPick((function ScaleByLegendaryResist(v) -> Some (v) | _ -> None))
+                let effectiveLRLabel =
+                    match lrChoice with
+                    | Some true ->
+                        Html.span [
+                            header "Reduced effectiveness"
+                            Html.h4 [prop.style [style.fontStyle.italic]; prop.text "Effectiveness graph will be divided by the number of saves the creature has to fail to be affected. \
+                                For example, a spell that is 100% effective will be shown as 25% effective if the creature has Legendary Resistance (3/Day)."]
+                            ]
+                    | _ -> header "Reduced effectiveness"
+                    |> prop.children
                 group [
                     radioOf "normalLR" "Ignore (just show chance of a single saving throw failure)" (lrChoice = Some false) (ScaleByLegendaryResist false)
-                    radioOf "effectiveLR" "Reduced effectiveness" (lrChoice = Some true) (ScaleByLegendaryResist true)
+                    radioOfBase "effectiveLR" effectiveLRLabel (lrChoice = Some true) (ScaleByLegendaryResist true)
                     ]
-                if lrChoice = Some true then
-                    header "Effectiveness graph will be divided by the number of saves the creature has to fail to be affected. \
-                        For example, a spell that is 100% effective will be shown as 25% effective if the creature has Legendary Resistance (3/Day)."
 
             if defenseChoice.Length > 0 then
                 Bulma.dropdownDivider []
@@ -267,21 +287,18 @@ module Settings =
                         label
                     ]
 
-            if analysisChoice = Some Encounter then
-                Html.h1 [prop.text "Sorry, encounter building isn't done yet. Please use Monsters (by CR) instead for now."; prop.style [style.color.red]]
-            else
-                let settings = (computeSettings model.choices)
-                Bulma.button.button [
-                    prop.disabled settings.IsNone
-                    prop.onClick (fun ev ->
-                                    match settings with
-                                    | Some settings ->
-                                        (UpdateSettings settings) |> dispatch
-                                        Evaluate Started |> dispatch
-                                    | _ -> ()
-                                    )
-                    prop.text "Start"
-                    ]
+            let settings = (computeSettings model.choices)
+            Bulma.button.button [
+                prop.disabled settings.IsNone
+                prop.onClick (fun ev ->
+                                match settings with
+                                | Some settings ->
+                                    (UpdateSettings settings) |> dispatch
+                                    Evaluate Started |> dispatch
+                                | _ -> ()
+                                )
+                prop.text "Start"
+                ]
             ]
 
 module Graph =
@@ -295,7 +312,18 @@ module Graph =
             | Wis -> (153, 0, 153) // purple
             | Cha -> (255, 255, 0) // yellow
         if background then color.rgba(r,g,b,0.1) else color.rgb(r,g,b)
-    let describeEncounter (ability: Ability) (defense:DefenseMethod) (dc: int) (encounter: Encounter) effectiveness =
+    let asCardinal = function
+        | 1 -> "1st"
+        | 2 -> "2nd"
+        | 3 -> "3rd"
+        | n -> (n.ToString()) + "th"
+    let addPrefix (settings: ConstructionSettings) lvl =
+        match settings.method with
+        | PureCR -> id // no party labels for non-encounters
+        | _ ->
+            fun label ->
+                sprintf "%s<br>With %d %s level PCs" label settings.partySize (asCardinal lvl)
+    let describeEncounter (ability: Ability) (defense:DefenseMethod) (dc: int) (encounter: Encounter) (nTargets, effectiveness) =
         let txt =
             System.String.Join(" and ",
                 encounter
@@ -314,7 +342,11 @@ module Graph =
                             sprintf "(%+i)" (abilityOf m ability |> stat)
                     if number = 1 then sprintf "%s %s" m.name modifier
                     else sprintf "%d %ss %s" number m.name modifier))
-        sprintf "DC %d %A %s vs. %s: %.1f%% effective" dc ability (if defense = Check then "check" else "save") txt effectiveness
+        match nTargets with
+        | None | Some 1 ->
+            sprintf "DC %d %A %s vs. %s: %.1f%% effective" dc ability (if defense = Check then "check" else "save") txt effectiveness
+        | Some nTargets ->
+            sprintf "DC %d %A %s vs. %s: %d-target AoE is %.1f%% effective" dc ability (if defense = Check then "check" else "save") txt nTargets effectiveness
     let myplot model traces =
         Plotly.plot [
             plot.style [style.margin 20]
@@ -357,9 +389,10 @@ module Graph =
                 // in this case we're going to ignore best/worst and just plot ALL the marks
                 let evaluateEncounter lvl encounter =
                     let dc = (Compute.dcOf model.evalSettings.dcComputer lvl)
-                    let effectiveness = Compute.calculateEffectiveness lr resp.attack resp.ability dc encounter
-                    let label = describeEncounter resp.ability defense dc encounter effectiveness
+                    let (nTargets, effectiveness) = Compute.calculateEffectiveness lr resp.attack resp.ability dc encounter
+                    let label = describeEncounter resp.ability defense dc encounter (Some nTargets, effectiveness)
                     {| x = lvl; y = effectiveness; label = label |}
+                let addPrefix = addPrefix model.constructSettings
                 let marks = data |> List.collect(fun { pcLevel = lvl; average = Result(_, encounters) } -> encounters |> List.map (evaluateEncounter lvl))
                             |> List.groupBy(fun d -> d.x, d.y)
                             |> List.map(fun ((x,y), entries) ->
@@ -379,7 +412,7 @@ module Graph =
                         scatter.y ys
                         scatter.marker (marks |> List.map (fun _ -> marker.color myColor))
                         scatter.text (marks
-                                        |> List.map (fun d -> d.label))
+                                        |> List.map (fun d -> addPrefix (int d.x) d.label))
                         scatter.hoverinfo.text
                         scatter.showlegend false
                         scatter.hoveron.points
@@ -422,7 +455,7 @@ module Graph =
                         scatter.x xs
                         scatter.y ys
                         scatter.marker (marks |> List.map (fun _ -> marker.color myColor))
-                        scatter.text (marks |> List.map (fun (lvl, Result(effectiveness, encounters)) -> describeEncounter resp.ability defense (dcOf lvl) (encounters |> List.exactlyOne) effectiveness))
+                        scatter.text (marks |> List.map (fun (lvl, Result(effectiveness, encounters)) -> describeEncounter resp.ability defense (dcOf lvl) (encounters |> List.exactlyOne) (None, effectiveness) |> addPrefix model.constructSettings (int lvl)))
                         scatter.hoverinfo.text
                         scatter.showlegend false
                         scatter.hoveron.points

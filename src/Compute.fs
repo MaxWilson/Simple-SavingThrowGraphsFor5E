@@ -111,13 +111,9 @@ let headerDecoder : Decoder<Header> =
         })
 
 
-#if INTERACTIVE
-initialize (System.IO.File.ReadAllText(sprintf @"c:\code\saves\public\creatures.json") |> Thoth.Json.Net.Decode.fromString (Decode.array headerDecoder) |> function Ok v -> v)
-#endif
-
 type Encounter = (int * Header) list
 type Difficulty = Easy | Medium | Hard | Deadly | Ludicrous
-type XanatharMethod = BiggestMob | Solo | MedianMob | RandomMob | Mixed
+type XanatharMethod = Solo | Group | Mixed
 type ConstructionMethod = PureCR | Xanathar of XanatharMethod * Difficulty | DMG of Difficulty | ShiningSword of Difficulty
 type ConstructionSettings = {
     sources: string list // allowed sources, e.g. Volo's, MM
@@ -147,6 +143,12 @@ type EvaluationSettings = {
     scaleEffectivenessDownByLegendaryResistance: bool
     }
 type Evaluate = ConstructEncounter -> ConstructionSettings -> EvaluationSettings -> EvaluationResponse list
+let encounterToString (e:Encounter) = System.String.Join(" and ", e |> List.map (fun (n,m) -> if n = 1 then m.name else sprintf "%d %ss" n m.name))
+
+#if INTERACTIVE
+initialize (System.IO.File.ReadAllText(sprintf @"c:\code\saves\public\creatures.json") |> Thoth.Json.Net.Decode.fromString (Decode.array headerDecoder) |> function Ok v -> v)
+fsi.AddPrinter encounterToString
+#endif
 
 let save (stat, save) =
     match save with
@@ -173,7 +175,7 @@ let hasAdvantage (defense:DefenseMethod) (ability: Ability) (m: Header) =
             | Cha -> adv "charisma")
         || (defense = Save && m.stats.magicResistance)
 
-let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : float =
+let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (encounter: Encounter) : int * float =
     let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
     let effectivenessOfDefense (m: Header) defense =
         let success bonus dc =
@@ -189,17 +191,20 @@ let calculateEffectiveness scaleByLR (a: Attack) (ability: Ability) (dc: int) (e
                 | Some n -> (effectiveness / (float n + 1.))
                 | None -> effectiveness
         | Check -> success (abilityOf m ability |> stat) dc
-    let numberAffected =
+    let numberOfTargets, numberAffected =
         match a with
-        | SingleTarget d -> encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max
+        | SingleTarget d -> 1, encounter |> List.map(fun (n,m) -> effectivenessOfDefense m d) |> List.max
         | AoE(d, maxTargets, maxPct) ->
             let enemies = encounter |> List.collect(fun (n,m) -> let e = effectivenessOfDefense m d in List.init n (fun _ -> e))
-            if enemies.Length <= 1 then enemies.Head
+            if enemies.Length <= 1 then 1, enemies.Head
             else
-                enemies |> List.sortDescending |> List.take(min (float enemies.Length * maxPct/100. |> int) maxTargets)
-                |> List.sum
+                let nTargets = min (float enemies.Length * maxPct/100. |> int) maxTargets
+                let successCount =
+                    enemies |> List.sortDescending |> List.take nTargets
+                    |> List.sum
+                nTargets, successCount
     let effectiveness = numberAffected / (float numberOfMonsters) * 100.
-    effectiveness
+    numberOfTargets, effectiveness
 
 let dcOf =
     function
@@ -217,7 +222,7 @@ let dcOf =
 
 let eval: Evaluate = fun construct constructSettings evalSettings ->
     let range = match constructSettings.method with PureCR -> [0.; 0.125; 0.25; 0.5] @ [1. .. 30.] | _ -> [1. .. 20.]
-    let N = 1000
+    let N = 20
     let encountersByLevel = range |> Seq.map(fun level -> level, construct constructSettings level N) |> Map.ofSeq
     let linesOf (settings: EvaluationSettings) =
         [
@@ -243,12 +248,12 @@ let eval: Evaluate = fun construct constructSettings evalSettings ->
 
                     let encounters = encountersByLevel.[level]
                     let by f =
-                            let c = (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc)
-                            let e = encounters |> f c
-                            in Result(c e, [e])
+                            let calc e = (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc e)
+                            let e = encounters |> f (calc >> snd)
+                            in Result(calc e |> snd, [e])
                     if not encounters.IsEmpty then {
                         pcLevel = level
-                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc), encounters)
+                        average = Result(encounters |> Seq.averageBy (calculateEffectiveness evalSettings.scaleEffectivenessDownByLegendaryResistance attack ability dc >> snd), encounters)
                         best = by Seq.maxBy
                         worst = by Seq.minBy
                         }
@@ -270,69 +275,128 @@ let constructPureCR : ConstructEncounter =
         // 1 of each creature at each CR, ignoring N
         List.ofArray (creatures |> Array.map (fun m -> [1, m]))
 
-let constructXanathar : ConstructEncounter =
-    let crs = [0.; 0.125; 0.25; 0.5] @ [1. .. 30.]
+module Xanathar =
+    // deliberately skipping over CR 0 because they are boring encounters
+    let crs = [0.125; 0.25; 0.5] @ [1. .. 30.] |> Array.ofList
     let row start values =
         let mk ratios =
-            let hds = crs |> List.take (List.length ratios)
-            let m = List.zip hds ratios |> Map.ofList
+            let ratios = Array.ofList ratios
+            let hds = crs |> Array.take (Array.length ratios)
+            let m = Array.zip hds ratios |> Map.ofArray
             fun cr -> m |> Map.tryFind cr
         match start with
         | (1,8) -> [1,12]@values |> mk
         | (1,1) -> [1,12;1,12;1,12;1,12]@values |> mk
         | (2,1) -> [1,12;1,12;1,12;1,12;1,12]@values |> mk
         | _ -> fun _ -> None
-    let table =
+    let groupRatios =
         let rows = Map.ofList [
-                1, row (1,8) [1,2;1,1;3,1;5,1]
-                2, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                3, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                4, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                5, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                6, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                7, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                8, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                9, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                10, row (1,8) [1,3;1,2;1,1;3,1;6,1]
-                11, row (1,1) [1,3;1,2;1,1;3,1;6,1]
-                12, row (1,1) [1,3;1,2;1,1;3,1;6,1]
-                13, row (1,1) [1,3;1,2;1,1;3,1;6,1]
-                14, row (1,1) [1,3;1,2;1,1;3,1;6,1]
-                15, row (1,1) [1,3;1,2;1,1;3,1;6,1]
-                16, row (2,1) [1,3;1,2;1,1;3,1;6,1]
-                17, row (2,1) [1,3;1,2;1,1;3,1;6,1]
-                18, row (2,1) [1,3;1,2;1,1;3,1;6,1]
-                19, row (2,1) [1,3;1,2;1,1;3,1;6,1]
-                20, row (2,1) [1,3;1,2;1,1;3,1;6,1]
+                1, row (1,8) [1,2; 1,1; 3,1; 5,1]
+                2, row (1,8) [1,3; 1,2; 1,1; 3,1; 6,1]
+                3, row (1,8) [1,5; 1,2; 1,1; 2,1; 4,1; 6,1]
+                4, row (1,8) [1,8; 1,4; 1,2; 1,1; 2,1; 4,1; 6,1]
+                5, row (1,8) [1,12; 1,8; 1,4; 1,2; 1,1; 2,1; 3,1; 5,1; 6,1]
+                6, row (1,8) [1,12; 1,9; 1,5; 1,2; 1,1; 2,1; 2,1; 4,1; 5,1; 6,1]
+                7, row (1,8) [1,12; 1,12; 1,6; 1,3; 1,1; 1,1; 2,1; 3,1; 4,1; 5,1]
+                8, row (1,8) [1,12; 1,12; 1,7; 1,4; 1,2; 1,1; 2,1; 3,1; 3,1; 4,1; 6,1]
+                9, row (1,8) [1,12; 1,12; 1,8; 1,4; 1,2; 1,1; 1,1; 2,1; 3,1; 4,1; 5,1; 6,1]
+                10, row (1,8) [1,12; 1,12; 1,10; 1,5; 1,2; 1,1; 1,1; 2,1; 2,1; 3,1; 4,1; 5,1; 6,1]
+                11, row (1,1) [1,6; 1,3; 1,2; 1,1; 2,1; 2,1; 2,1; 3,1; 4,1; 5,1; 6,1]
+                12, row (1,1) [1,8; 1,3; 1,2; 1,1; 1,1; 2,1; 2,1; 3,1; 3,1; 4,1; 5,1; 6,1]
+                13, row (1,1) [1,9; 1,4; 1,2; 1,2; 1,1; 1,1; 2,1; 2,1; 3,1; 3,1; 4,1; 5,1; 6,1]
+                14, row (1,1) [1,10; 1,4; 1,3; 1,2; 1,1; 1,1; 2,1; 2,1; 3,1; 3,1; 4,1; 4,1; 5,1; 6,1]
+                15, row (1,1) [1,12; 1,5; 1,3; 1,2; 1,1; 1,1; 1,1; 2,1; 2,1; 3,1; 3,1; 4,1; 5,1; 5,1; 6,1]
+                16, row (2,1) [1,5; 1,3; 1,2; 1,1; 1,1; 1,1; 2,1; 2,1; 2,1; 3,1; 4,1; 4,1; 5,1; 5,1; 6,1]
+                17, row (2,1) [1,7; 1,4; 1,3; 1,2; 1,1; 1,1; 1,1; 2,1; 2,1; 2,1; 3,1; 3,1; 4,1; 4,1; 5,1; 6,1]
+                18, row (2,1) [1,7; 1,5; 1,3; 1,2; 1,1; 1,1; 1,1; 2,1; 2,1; 2,1; 3,1; 3,1; 4,1; 4,1; 5,1; 6,1; 6,1]
+                19, row (2,1) [1,8; 1,5; 1,3; 1,2; 1,2; 1,1; 1,1; 1,1; 2,1; 2,1; 2,1; 3,1; 3,1; 4,1; 4,1; 5,1; 6,1; 6,1]
+                20, row (2,1) [1,9; 1,6; 1,4; 1,2; 1,2; 1,1; 1,1; 1,1; 1,1; 2,1; 2,1; 2,1; 3,1; 3,1; 4,1; 4,1; 5,1; 5,1; 6,1]
             ]
         fun lvl cr ->
             rows |> Map.tryFind lvl |> Option.bind (fun m -> m cr)
-    fun (settings: ConstructionSettings) lvl N ->
-        let creatures =
-            match byCR |> Map.tryFind cr with
-            | Some creatures ->
-                creatures |> Array.filter (fun (m:Header) ->
-                    settings.sources |> List.exists((=) m.sourcebook)
-                    && (settings.creatureType.IsEmpty
-                        || settings.creatureType |> List.exists((=)m.creatureType)))
-            | None -> Array.empty
-        let rec generate() =
-            let mutable budget = float settings.partySize
-            let cr = chooseFrom (crs |> Array.filter (fun cr ->
-                match table lvl cr with
-                | Some(n,m) -> (float n)/(float m) <- budget
-                | _ -> false)
-            let cost
-        List.init N (fun _ -> generate(())
-        // 1 of each creature at each CR, ignoring N
-        List.ofArray (creatures |> Array.map (fun m -> [1, m]))
+    let soloMax =
+        [
+            2,2,1
+            4,3,2
+            5,4,3
+            6,5,4
+            9,8,7
+            10,9,8
+            11,10,9
+            12,11,10
+            13,12,11
+            14,13,12
+            15,14,13
+            17,16,15
+            18,17,16
+            19,18,17
+            20,19,18
+            21,20,19
+            22,21,20
+            22,21,20
+            23,22,21
+            24,23,22
+        ]
+        |> List.mapi (fun ix (six, five, four) -> (ix+1), {| six = six; five = five; four = four |})
+        |> Map.ofSeq
 
 let buildEncounter: ConstructEncounter =
     fun settings lvl N ->
         match settings.method with
         | PureCR -> constructPureCR settings lvl N
         | Xanathar(typ, diff) ->
-            // for now we will ignore the type
-            failwith "No impl"
+            let lvl = int lvl
+            let creature =
+                let creatures = byCR |> Map.map(fun lvl creatures ->
+                    creatures |> Array.filter (fun (m:Header) ->
+                        settings.sources |> List.exists((=) m.sourcebook)
+                        && (settings.creatureType.IsEmpty
+                            || settings.creatureType |> List.exists((=)m.creatureType))))
+                fun cr ->
+                    match creatures.[cr] with
+                    | cs when cs.Length > 0 -> cs |> chooseFrom |> Some
+                    | _ -> None
+            let rec generateGroupEncounter remainingBudget : Encounter =
+                let candidateCRs = (Xanathar.crs |> Array.filter (fun cr ->
+                    match Xanathar.groupRatios lvl cr with
+                    | Some(n,m) -> (float n)/(float m) <= remainingBudget
+                    | _ -> false))
+                if candidateCRs.Length = 0 then []
+                else
+                    let cr = chooseFrom candidateCRs
+                    let (monsterRatio, pcRatio) = Xanathar.groupRatios lvl cr |> Option.get
+                    let maxMonsters = remainingBudget * (float pcRatio) / (float monsterRatio) |> System.Math.Round |> int
+                    let numberOfMonsters =
+                        match r.Next 100 with
+                        | n when n <= 50 -> maxMonsters
+                        | _ -> 1 + r.Next(maxMonsters)
+                    match creature cr with
+                    | Some creature ->
+                        let cost = (float numberOfMonsters * float monsterRatio) / (float pcRatio)
+                        (numberOfMonsters, creature)::(generateGroupEncounter (remainingBudget - cost))
+                    | None -> // pick something else
+                        (generateGroupEncounter (remainingBudget))
+            let rec generateSolo cr : Encounter =
+                match creature (float cr) with
+                | Some creature -> [1, creature]
+                | None -> // no solo creatures at this level, try next lower
+                    if(cr - 1) > 0 then
+                        generateSolo (cr - 1)
+                    else []
+            let group =
+                let budget = float settings.partySize * match diff with Easy -> (2./3.) | Medium -> 1.0 | (Hard | _) -> 1.5
+                fun _ -> generateGroupEncounter budget
+            let solo =
+                let soloBudget = Xanathar.soloMax.[lvl]
+                let crMax =
+                    if settings.partySize <= 4 then soloBudget.four
+                    elif settings.partySize >= 6 then soloBudget.five
+                    else soloBudget.five
+                fun _ -> generateSolo crMax
+            match typ with
+            | Group -> List.init N group
+            | Solo -> List.init N solo
+            | Mixed -> List.init N (fun x -> (chooseFrom [|solo; group|]) x)
         | DMG diff | ShiningSword diff ->
             failwith "No impl"
+

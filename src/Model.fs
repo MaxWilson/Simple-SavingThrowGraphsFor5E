@@ -25,6 +25,7 @@ module Wizard =
         | SourceFilter of string list
         | TypeFilter of string list
         | ScaleByLegendaryResist of bool
+        | XanatharStyle of Compute.XanatharMethod
 type Model = {
     choices: Wizard.Choice list
     constructSettings: ConstructionSettings
