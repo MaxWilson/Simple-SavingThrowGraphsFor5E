@@ -401,7 +401,8 @@ module Graph =
                     let label = describeEncounter resp.ability defense dc model.focusTags encounter (nTargets, effectiveness)
                     {| x = lvl; y = effectiveness; label = label |}
                 let addPrefix = addPrefix model.constructSettings
-                let marks = data |> List.collect(fun { pcLevel = lvl; average = Result(_, encounters) } -> encounters |> List.map (evaluateEncounter lvl))
+                let data = data |> List.collect(fun { pcLevel = lvl; average = Result(_, encounters) } -> encounters |> List.map (evaluateEncounter lvl))
+                let marks = data
                             |> List.groupBy(fun d -> d.x, d.y)
                             |> List.map(fun ((x,y), entries) ->
                                 // If multiple monsters are on the same dot, we want to show them all
@@ -410,7 +411,6 @@ module Graph =
                                 | entries ->
                                     let jointLabel = System.String.Join("<br>", entries |> List.map(fun d -> d.label))
                                     {| x = x; y = y; label = jointLabel|})
-                let averageMarks = (data |> List.map (fun lr -> lr.pcLevel, lr.average))
                 let hover =
                     let xs = marks |> List.map (fun d -> d.x)
                     let ys = marks |> List.map (fun d -> d.y)
@@ -428,8 +428,9 @@ module Graph =
                         ]
                 let myline =
                     traces.scatter [
-                        scatter.x (averageMarks |> List.map fst)
-                        scatter.y (averageMarks |> List.map (fun (_, Result(effectiveness, _)) -> effectiveness))
+                        let linepoints = (data |> List.groupBy (fun d -> d.x) |> List.map (fun (x,ys) -> x, ys |> List.averageBy (fun d -> d.y)))
+                        scatter.x (linepoints |> List.map fst)
+                        scatter.y (linepoints |> List.map snd)
                         scatter.line [
                             line.color myColor
                         ]
