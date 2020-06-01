@@ -194,7 +194,7 @@ let calculateEffectiveness scaleByLR (a: Attack, tags: string list)(ability: Abi
         if tags |> List.exists(fun tag -> exists m.stats.damageImmunities && m.stats.damageImmunities.Contains tag || m.stats.conditionImmunities <> Unchecked.defaultof<_> && m.stats.conditionImmunities |> List.contains tag) then 0.
         else
             let success bonus dc =
-                min 1. (max 0. (float (dc - bonus) / 20.))
+                min 1. (max 0. (float (dc - bonus - 1)) / 20.)
             let sq v = v * v
             let mutable effectiveness =
                 match defense with
