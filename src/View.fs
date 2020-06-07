@@ -520,6 +520,7 @@ let view (model: Model) dispatch =
                 ]
 
             Bulma.section [
+                Html.a [prop.href "v0.1"; prop.text "Go to previous version"; prop.style[style.floatStyle.right]]
                 Bulma.title.h2 "Shining Sword Saving Throw Analyzer"
                 match model.creatures with
                 | NotStarted | InProgress -> ()

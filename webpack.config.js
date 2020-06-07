@@ -78,7 +78,7 @@ module.exports = {
         filename: isProduction ? '[name].[contenthash].js' : '[name].js',
     },
     mode: isProduction ? 'production' : 'development',
-    devtool: isProduction ? 'source-map' : 'eval-source-map',
+    devtool: isProduction ? null : 'eval-source-map',
     optimization: {
         splitChunks: {
             chunks: 'all'
