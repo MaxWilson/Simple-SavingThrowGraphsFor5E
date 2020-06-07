@@ -10,6 +10,7 @@ open Compute
 let fresh =
     {
     choices = []
+    construct = Model.Construct.empty
     constructSettings = { ConstructionSettings.creatureType = []; ConstructionSettings.sources = sources |> List.ofArray; ConstructionSettings.method = PureCR; ConstructionSettings.partySize = 4 }
     evalSettings = {
         abilities = []
@@ -60,6 +61,8 @@ let update msg model =
         { model with choices = choice::model.choices }, Cmd.Empty
     | UpdateSettings(c, e) ->
         { model with constructSettings = c; evalSettings = e }, Cmd.Empty
+    | UserChoice transform ->
+        { model with construct = model.construct |> transform }, Cmd.Empty
     | SetFocus ab -> { model with focus = ab }, Cmd.Empty
     | ToggleQuickView -> { model with showQuickview = not model.showQuickview }, Cmd.Empty
     | SetFocusTags tags -> { model with focusTags = tags }, Cmd.Empty

@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="DataExtraction.fsx" />
+    <Compile Include="Optics.fs" />
     <Compile Include="Compute.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="View.fs" />

@@ -40,21 +40,30 @@ module Construct =
         types: string list
         xanatharStyle: Compute.XanatharMethod option
         }
+    let empty = { analysis = None; encounterBuilder = None; difficulty = None;
+                    partySize = None; sources = []; types = []; xanatharStyle = None }
+    type Affordance<'t> =
+        {
+        heading: string
+        lens: Optics.Lens<Settings, 't option>
+        settings: ('t * string) list
+        }
+    let affordance(heading, lens, options) =
+        {
+        heading = heading
+        lens = lens
+        settings = options
+        }
     let (|Analysis|_|) settings = settings.analysis
     let (|EncounterBuilder|_|) settings = settings.encounterBuilder
     let (|Difficulty|_|) settings = settings.difficulty
     let (|XanatharStyle|_|) settings = settings.xanatharStyle
     let (|PartySize|_|) settings = settings.partySize
-    let analysisChoices = [PureCR, "Monsters (by CR)"; Encounter, "Encounters (by PC level)"]
-    let (|ConstructionMethod|_|) = function
-        | Analysis PureCR -> Some Compute.PureCR
-        | Analysis Encounter & EncounterBuilder(Xanathar) & Difficulty(Easy | Medium | Hard as diff) & XanatharStyle style ->
-            Compute.Xanathar(style, diff) |> Some
-        | Analysis Encounter & EncounterBuilder(DMG) & Difficulty(diff) ->
-            Compute.DMG diff |> Some
-        | Analysis Encounter & EncounterBuilder(ShiningSword) & Difficulty(diff) ->
-            Compute.ShiningSword diff |> Some
-        | _ -> None
+    let analysis =
+        affordance(
+            "What do you want to analyze?",
+            Optics.lens (fun d -> d.analysis) (fun v d -> { d with analysis = v }),
+            [PureCR, "Monsters (by CR)"; Encounter, "Encounters (by PC level)"])
     let (|ConstructionSettings|_|) settings =
         let settingsFor partySize method =
             {
@@ -76,6 +85,7 @@ module Construct =
 
 type Model = {
     choices: Wizard.Choice list
+    construct: Construct.Settings
     constructSettings: ConstructionSettings
     evalSettings: EvaluationSettings
     creatures: Deferred<Result<Header array, string>>
@@ -89,6 +99,7 @@ type Msg =
     | LoadCreatures of AsyncOperationStatus<Result<Header array, string>>
     | Evaluate of AsyncOperationStatus<Result<Graph, string>>
     | UpdateSettings of ConstructionSettings * EvaluationSettings
+    | UserChoice of (Construct.Settings -> Construct.Settings)
     | Choose of Wizard.Choice
     | Reset
     | SetFocus of Ability option

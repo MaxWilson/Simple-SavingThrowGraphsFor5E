@@ -8,6 +8,7 @@ open Feliz.Bulma.Checkradio
 open Feliz.Bulma.Switch
 open Feliz.Bulma.PageLoader
 open Feliz.Bulma.QuickView
+open Optics
 
 let header (txt: string) =
     Html.span [
@@ -54,6 +55,8 @@ let toggle choices choice =
 module Settings =
     open Compute
     open Model.Wizard
+    open Model.Construct
+
     let computeSettings choices =
         let (|AnalysisChoice|_|) choices = choices |> List.tryPick((function AnalysisType(v) -> Some (v) | _ -> None))
         let (|MethodChoice|_|) choices = choices |> List.tryPick((function EncounterMethod(v) -> Some (v) | _ -> None))
@@ -119,10 +122,31 @@ module Settings =
 
     let view (model: Model) dispatch =
         React.fragment [
+            let radioOf2 (id:string) txt (isChecked: bool) transform = radioOfBase dispatch (id:string) txt (isChecked: bool) (UserChoice transform)
             let radioOfBase (id:string) child (isChecked: bool) msg = radioOfBase dispatch (id:string) child (isChecked: bool) (Choose msg)
             let radioOf (id:string) txt (isChecked: bool) msg = radioOf dispatch (id:string) txt (isChecked: bool) (Choose msg)
             let checkboxOf (id:string) txt (isChecked: bool) msg = checkboxOf dispatch (id:string) txt (isChecked: bool) (Choose msg)
 
+            let settings = model.construct
+            let analysis = settings.analysis
+            let renderBase (affordance: Model.Construct.Affordance<_>) extras =
+                let current = settings |> read affordance.lens
+                React.fragment [
+                    header affordance.heading
+                    Bulma.field.p ([
+                        for (value, label) in affordance.settings do
+                            let id = value.ToString()
+                            Checkradio.radio [ prop.id id; prop.name id; prop.isChecked ((current = Some value)); prop.onCheckedChange (fun _ -> dispatch (write affordance.lens (Some value) |> UserChoice))]
+                            Html.label [ prop.htmlFor id; prop.text label]
+                        ] @ extras)
+                ]
+            let render affordance = renderBase affordance []
+            renderBase Model.Construct.analysis [
+                Bulma.button.button [
+                    prop.text "Set filters"
+                    prop.onClick (fun _ -> dispatch ToggleQuickView)
+                    ]
+                ]
             let analysisChoice = model.choices |> List.tryPick((function AnalysisType(v) -> Some (v) | _ -> None))
             header "What do you want to analyze?"
             Bulma.field.p [
@@ -133,13 +157,10 @@ module Settings =
                 for radio, label in rads do
                     radio
                     label
-                Bulma.button.button [
-                    prop.text "Set filters"
-                    prop.onClick (fun _ -> dispatch ToggleQuickView)
-                    ]
+
                 ]
 
-            if analysisChoice = Some Encounter then
+            if settings.analysis = Some Encounter then
                 Bulma.dropdownDivider []
                 let methodChoice = model.choices |> List.tryPick((function EncounterMethod(v) -> Some (v) | _ -> None))
                 header "How do you want to balance the encounters?"
