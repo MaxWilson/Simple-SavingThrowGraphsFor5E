@@ -4,10 +4,9 @@ open Model
 open Feliz
 open Feliz.Plotly
 open Feliz.Bulma
-open Feliz.Bulma.Checkradio
-open Feliz.Bulma.Switch
-open Feliz.Bulma.PageLoader
-open Feliz.Bulma.QuickView
+
+let tryParse (txt: string) = System.Int32.TryParse txt
+let tryParseDouble (txt:string) = System.Double.TryParse txt
 
 let header (txt: string) =
     Html.span [
@@ -20,10 +19,10 @@ let radioOfBase dispatch (id:string) child (isChecked: bool) msg =
 let radioOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
     radioOfBase dispatch id (prop.text txt) isChecked msg
 let checkboxOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
-    Switch.checkbox [ Checkradio.checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
+    Switch.checkbox [ checkradio.isMedium; prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
     ,Html.label [ prop.htmlFor id; prop.text txt ]
 let smallCheckboxOf dispatch (id:string) (txt:string) (isChecked: bool) msg =
-    Switch.checkbox [ Checkradio.checkradio.isSmall; prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
+    Switch.checkbox [ checkradio.isSmall; prop.id id; prop.name id; prop.isChecked isChecked; prop.onCheckedChange (fun _ -> dispatch msg)]
     ,Html.label [ prop.htmlFor id; prop.text txt ]
 let group (bs: (ReactElement * ReactElement) list) =
     Bulma.field.p [
@@ -177,7 +176,7 @@ module Settings =
                         prop.placeholder "Party size"
                         match partySize with Some dc -> prop.value (dc.ToString()) | _ -> prop.value ""
                         prop.onChange(fun str ->
-                            match System.Int32.TryParse str with
+                            match tryParse str with
                             | true, n -> dispatch (Choose (PartySize n))
                             | _ -> ()
                             )
@@ -198,7 +197,7 @@ module Settings =
                                     prop.placeholder "40%"
                                     prop.value (maxPct.ToString())
                                     prop.onChange(fun str ->
-                                        match System.Double.TryParse str with
+                                        match tryParseDouble str with
                                         | true, n -> dispatch (Choose (TargetingChoice (AoE(maxTargets, n))))
                                         | _ -> ()
                                         )
@@ -209,7 +208,7 @@ module Settings =
                                     prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft 5; style.marginRight 5]
                                     prop.placeholder "max number"
                                     prop.value (maxTargets.ToString())
-                                    prop.onChange(fun str ->
+                                    prop.onChange(fun (str: string) ->
                                         match System.Int32.TryParse str with
                                         | true, n -> dispatch (Choose (TargetingChoice (AoE(n, maxPct))))
                                         | _ -> ()
@@ -276,7 +275,7 @@ module Settings =
                                 prop.style [style.maxWidth (length.em 4); style.verticalAlign.middle; style.marginLeft (length.em 2)]
                                 prop.placeholder "DC"
                                 match dc with Some dc -> prop.value (dc.ToString()) | _ -> ()
-                                prop.onChange(fun str ->
+                                prop.onChange(fun (str: string) ->
                                     match System.Int32.TryParse str with
                                     | true, n -> dispatch (Choose (ChooseDC (Fixed (Some n))))
                                     | _ -> dispatch (Choose (ChooseDC (Fixed None)))

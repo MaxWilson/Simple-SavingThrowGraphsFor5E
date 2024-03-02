@@ -26,12 +26,15 @@ let fresh =
 let init _ =
     fresh, Cmd.Empty
 
+let fromAsync (operation: Async<'msg>) : Cmd<'msg> =
+    Cmd.OfAsync.perform (fun () -> operation) () id
+
 let update msg model =
     match msg with
     | Reset ->
         { fresh with creatures = model.creatures; choices = model.choices |> List.filter (function  Model.Wizard.TypeFilter _ | Model.Wizard.SourceFilter _ -> true | _ -> false) }, Cmd.Empty
     | LoadCreatures(Started) ->
-        { model with creatures = InProgress }, Cmd.OfAsync.result (async {
+        { model with creatures = InProgress }, fromAsync (async {
             let! (statusCode, responseText) = Http.get "creatures.json"
             if statusCode = 200 then
                 match Thoth.Json.Decode.fromString (Decode.array headerDecoder) (responseText) with
@@ -46,7 +49,7 @@ let update msg model =
     | LoadCreatures(Finished v) ->
         { model with creatures = Resolved(v) }, Cmd.Empty
     | Evaluate(Started) ->
-        { model with analysis = InProgress }, Cmd.OfAsync.result (async {
+        { model with analysis = InProgress }, fromAsync (async {
             do! Async.Sleep 100
             try
                 let evalResps = Compute.eval Compute.buildEncounter model.constructSettings model.evalSettings

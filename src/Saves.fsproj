@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-	<LangVersion>preview</LangVersion>
+    <TargetFramework>net7.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <None Include="DataExtraction.fsx" />
@@ -12,16 +11,17 @@
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Fable.Elmish.HMR" Version="4.0.1" />
-    <PackageReference Include="Fable.Elmish.React" Version="3.0.1" />
-    <PackageReference Include="Fable.SimpleHttp" Version="3.0.0" />
-    <PackageReference Include="Feliz" Version="1.1.0" />
-    <PackageReference Include="Feliz.Bulma" Version="2.2.0" />
-    <PackageReference Include="Feliz.Bulma.Checkradio" Version="1.0.1" />
-    <PackageReference Include="Feliz.Bulma.PageLoader" Version="1.0.0" />
-    <PackageReference Include="Feliz.Bulma.QuickView" Version="1.0.1" />
-    <PackageReference Include="Feliz.Bulma.Switch" Version="1.0.0" />
-    <PackageReference Include="Feliz.Plotly" Version="1.0.1" />
-    <PackageReference Include="Thoth.Json" Version="4.1.0" />
+    <PackageReference Include="Fable.Elmish.HMR" Version="7.0.0" />
+    <PackageReference Include="Fable.Elmish.React" Version="4.0.0" />
+    <PackageReference Include="Fable.React" Version="9.3.0" />
+    <PackageReference Include="Fable.SimpleHttp" Version="3.6.0" />
+    <PackageReference Include="Feliz" Version="2.7.0" />
+    <PackageReference Include="Feliz.Bulma" Version="3.0.0" />
+    <PackageReference Include="Feliz.Bulma.Checkradio" Version="3.0.0" />
+    <PackageReference Include="Feliz.Bulma.PageLoader" Version="3.0.0" />
+    <PackageReference Include="Feliz.Bulma.QuickView" Version="3.0.0" />
+    <PackageReference Include="Feliz.Bulma.Switch" Version="3.0.0" />
+    <PackageReference Include="Feliz.Plotly" Version="2.1.0" />
+    <PackageReference Include="Thoth.Json" Version="10.2.0" />
   </ItemGroup>
 </Project>

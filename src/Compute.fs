@@ -176,7 +176,9 @@ let abilityOf m = function
 let hasAdvantage (defense:DefenseMethod) (ability: Ability) tags (m: Header) =
     if m.stats.advantage = null then (defense = Save && m.stats.magicResistance)
     else
-        let adv txt = m.stats.advantage.ToLowerInvariant().Contains(txt)
+        let adv (txt: string) =
+            let adv: string = m.stats.advantage.ToLowerInvariant()
+            adv.Contains(txt)
         (match ability with
             | Str -> adv "strength"
             | Dex -> adv "dexterity"
@@ -185,7 +187,7 @@ let hasAdvantage (defense:DefenseMethod) (ability: Ability) tags (m: Header) =
             | Wis -> adv "wisdom"
             | Cha -> adv "charisma")
         || (defense = Save && m.stats.magicResistance)
-        || tags |> List.exists (fun tag -> m.stats.advantage.Contains tag)
+        || tags |> List.exists (fun (tag: string) -> m.stats.advantage.Contains tag)
 
 let calculateEffectiveness scaleByLR (a: Attack, tags: string list)(ability: Ability) (dc: int) (encounter: Encounter) : int option * float =
     let numberOfMonsters = encounter |> List.sumBy(fun (n, m) -> n)
