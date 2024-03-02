@@ -366,7 +366,7 @@ module Xanathar =
         |> Map.ofSeq
 
 module DMGish =
-    open System.Math
+    open type System.Math
     type Advancement = { level: int; XPReq: int; proficiencyBonus: int }
     let levelAdvancement =
         [|
